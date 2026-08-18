@@ -788,34 +788,21 @@ async function syncRoomToSupabase(mode: "insert" | "upsert", payload: Record<str
 }
 
 export const addRoomDb = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      property: z.string(),
-      room_type_slug: z.string(),
-      advance_amount: z.number().min(0).optional().default(1),
-      price_per_night: z.number().min(0).optional().default(3500),
-      photos: z.array(z.string()).optional().default([]),
-      max_guests: z.number().optional().default(4),
-      max_adults: z.number().optional().default(2),
-      max_kids: z.number().optional().default(1),
-      bed_type: z.string().optional().default("King Bed"),
-    }),
-  )
-  .handler(async ({ data }) => {
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const room = data?.data || data || {};
     const insertPayload: Record<string, unknown> = {
-      id: data.id,
-      name: data.name,
-      property: data.property,
-      room_type_slug: data.room_type_slug,
-      advance_amount: data.advance_amount,
-      price_per_night: data.price_per_night,
-      photos: data.photos,
-      max_guests: data.max_guests,
-      max_adults: data.max_adults,
-      max_kids: data.max_kids,
-      bed_type: data.bed_type,
+      id: room.id,
+      name: room.name,
+      property: room.property,
+      room_type_slug: room.room_type_slug || room.roomTypeSlug,
+      advance_amount: room.advance_amount ?? room.advanceAmount ?? 1000,
+      price_per_night: room.price_per_night ?? room.pricePerNight ?? 3500,
+      photos: room.photos || [],
+      max_guests: room.max_guests ?? room.maxGuests ?? 4,
+      max_adults: room.max_adults ?? room.maxAdults ?? 2,
+      max_kids: room.max_kids ?? room.maxKids ?? 1,
+      bed_type: room.bed_type || room.bedType || "King Bed",
     };
     const res = await syncRoomToSupabase("insert", insertPayload);
     if (!res.success) {
@@ -825,36 +812,23 @@ export const addRoomDb = createServerFn({ method: "POST" })
   });
 
 export const updateRoomDb = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      property: z.string(),
-      room_type_slug: z.string(),
-      advance_amount: z.number().min(0).optional().default(1),
-      price_per_night: z.number().min(0).optional().default(3500),
-      photos: z.array(z.string()).optional().default([]),
-      max_guests: z.number().optional().default(4),
-      max_adults: z.number().optional().default(2),
-      max_kids: z.number().optional().default(1),
-      bed_type: z.string().optional().default("King Bed"),
-    }),
-  )
-  .handler(async ({ data }) => {
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const room = data?.data || data || {};
     const payload: Record<string, unknown> = {
-      id: data.id,
-      name: data.name,
-      property: data.property,
-      room_type_slug: data.room_type_slug,
-      advance_amount: data.advance_amount,
-      price_per_night: data.price_per_night,
-      photos: data.photos,
-      max_guests: data.max_guests,
-      max_adults: data.max_adults,
-      max_kids: data.max_kids,
-      bed_type: data.bed_type,
+      id: room.id,
+      name: room.name,
+      property: room.property,
+      room_type_slug: room.room_type_slug || room.roomTypeSlug,
+      advance_amount: room.advance_amount ?? room.advanceAmount ?? 1000,
+      price_per_night: room.price_per_night ?? room.pricePerNight ?? 3500,
+      photos: room.photos || [],
+      max_guests: room.max_guests ?? room.maxGuests ?? 4,
+      max_adults: room.max_adults ?? room.maxAdults ?? 2,
+      max_kids: room.max_kids ?? room.maxKids ?? 1,
+      bed_type: room.bed_type || room.bedType || "King Bed",
     };
-    const res = await syncRoomToSupabase("upsert", { id: data.id, ...payload });
+    const res = await syncRoomToSupabase("upsert", payload);
     if (!res.success) {
       console.warn("Could not upsert room into Supabase DB:", res.error);
     }
@@ -862,25 +836,26 @@ export const updateRoomDb = createServerFn({ method: "POST" })
   });
 
 export const deleteRoomDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("rooms").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const id = data?.id || data?.data?.id || "";
+    const { error } = await supabase.from("rooms").delete().eq("id", id);
+    if (error) {
+      console.warn("Supabase delete room note:", error.message);
+    }
     return { success: true };
   });
 
 export const updateRoomAdvanceDb = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      id: z.string(),
-      advance_amount: z.number().min(0),
-    }),
-  )
-  .handler(async ({ data }) => {
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const d = data?.data || data || {};
+    const id = d.id;
+    const advanceAmount = d.advance_amount ?? d.advanceAmount ?? 1000;
     const { error } = await supabase
       .from("rooms")
-      .update({ advance_amount: data.advance_amount })
-      .eq("id", data.id);
+      .update({ advance_amount: advanceAmount })
+      .eq("id", id);
     if (error) {
       console.warn("Supabase update room advance note:", error.message);
     }
@@ -889,22 +864,20 @@ export const updateRoomAdvanceDb = createServerFn({ method: "POST" })
 
 // Events CRUD
 export const syncEventDb = createServerFn({ method: "POST" })
-  .validator(z.object({ event: z.any() }))
-  .handler(async ({ data }) => {
-    const evt = data.event;
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const evt = data?.event || data?.data || data || {};
     const payload = {
       id: evt.id,
       title: evt.title,
-      description: evt.description,
+      description: evt.description || "",
       property: evt.property,
       venue: evt.venue,
-      date: evt.date,
-      capacity: evt.capacity,
-      price: evt.price,
-      image: evt.image,
-      photos: evt.photos || [],
-      is_highlighted: evt.isHighlighted ?? false,
-      created_at: evt.createdAt || new Date().toISOString(),
+      capacity: evt.capacity || "",
+      tag: evt.tag || "Wedding",
+      image_url: evt.image_url || evt.imageUrl || evt.image || "",
+      is_highlighted: evt.is_highlighted ?? evt.isHighlighted ?? false,
+      created_at: evt.created_at || evt.createdAt || new Date().toISOString(),
     };
     const { error } = await supabase.from("events").upsert(payload);
     if (error) console.warn("Supabase sync event note:", error.message);
@@ -912,9 +885,10 @@ export const syncEventDb = createServerFn({ method: "POST" })
   });
 
 export const deleteEventDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("events").delete().eq("id", data.id);
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const id = data?.id || data?.data?.id || "";
+    const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) console.warn("Supabase delete event note:", error.message);
     return { success: true };
   });
@@ -931,29 +905,29 @@ const OPTIONAL_EVENT_BOOKING_COLUMNS = [
 ];
 
 export const syncEventBookingDb = createServerFn({ method: "POST" })
-  .validator(z.object({ booking: z.any() }))
-  .handler(async ({ data }) => {
-    const eb = data.booking;
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const eb = data?.booking || data?.data || data || {};
     const currentPayload: Record<string, unknown> = {
       id: eb.id,
-      event_id: eb.eventId || null,
-      event_title: eb.eventTitle,
+      event_id: eb.eventId || eb.event_id || null,
+      event_title: eb.eventTitle || eb.event_title || "",
       property: eb.property,
       venue: eb.venue,
-      user_email: eb.userEmail,
-      user_name: eb.userName,
-      event_date: eb.eventDate,
-      guests_count: eb.guestsCount,
-      guest_details: eb.guestDetails,
-      status: eb.status,
-      total_amount: eb.totalAmount ?? null,
-      advance_amount: eb.advanceAmount ?? null,
-      payments_history: eb.paymentsHistory ?? null,
-      extra_charges: eb.extraCharges ?? null,
-      custom_grand_total: eb.customGrandTotal ?? null,
-      checked_in_at: eb.checkedInAt ?? null,
-      checked_out_at: eb.checkedOutAt ?? null,
-      created_at: eb.createdAt || new Date().toISOString(),
+      user_email: eb.userEmail || eb.user_email || "",
+      user_name: eb.userName || eb.user_name || "",
+      event_date: eb.eventDate || eb.event_date || "",
+      guests_count: eb.guestsCount ?? eb.guests_count ?? 1,
+      guest_details: eb.guestDetails || eb.guest_details || {},
+      status: eb.status || "confirmed",
+      total_amount: eb.totalAmount ?? eb.total_amount ?? null,
+      advance_amount: eb.advanceAmount ?? eb.advance_amount ?? null,
+      payments_history: eb.paymentsHistory ?? eb.payments_history ?? null,
+      extra_charges: eb.extraCharges ?? eb.extra_charges ?? null,
+      custom_grand_total: eb.customGrandTotal ?? eb.custom_grand_total ?? null,
+      checked_in_at: eb.checkedInAt ?? eb.checked_in_at ?? null,
+      checked_out_at: eb.checkedOutAt ?? eb.checked_out_at ?? null,
+      created_at: eb.createdAt || eb.created_at || new Date().toISOString(),
     };
 
     while (true) {
@@ -984,9 +958,10 @@ export const syncEventBookingDb = createServerFn({ method: "POST" })
   });
 
 export const deleteEventBookingDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("event_bookings").delete().eq("id", data.id);
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const id = data?.id || data?.data?.id || "";
+    const { error } = await supabase.from("event_bookings").delete().eq("id", id);
     if (error) {
       console.warn("Supabase delete event booking note:", error.message);
     }
@@ -995,14 +970,14 @@ export const deleteEventBookingDb = createServerFn({ method: "POST" })
 
 // Gallery Items CRUD
 export const syncGalleryDb = createServerFn({ method: "POST" })
-  .validator(z.object({ item: z.any() }))
-  .handler(async ({ data }) => {
-    const g = data.item;
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const g = data?.item || data?.data || data || {};
     const payload = {
       id: g.id,
       src: g.src,
-      tag: g.tag,
-      category: g.category,
+      tag: g.tag || "General",
+      category: g.category || "Rooms",
       title: g.title || null,
     };
     const { error } = await supabase.from("gallery_items").upsert(payload);
@@ -1011,9 +986,10 @@ export const syncGalleryDb = createServerFn({ method: "POST" })
   });
 
 export const deleteGalleryDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("gallery_items").delete().eq("id", data.id);
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const id = data?.id || data?.data?.id || "";
+    const { error } = await supabase.from("gallery_items").delete().eq("id", id);
     if (error) console.warn("Supabase delete gallery item note:", error.message);
     return { success: true };
   });
