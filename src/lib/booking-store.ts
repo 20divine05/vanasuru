@@ -382,18 +382,23 @@ class Store {
       });
 
       this.bookings = mergedBookings.filter((b) => !this.deletedBookingIds.has(b.id));
-      this.locations = data.locations && data.locations.length > 0 ? data.locations : this.locations;
-      this.rooms = data.rooms && data.rooms.length > 0 ? data.rooms : this.rooms;
-      if (data.users && data.users.length > 0) {
+
+      if (Array.isArray(data.locations)) {
+        this.locations = data.locations;
+      }
+      if (Array.isArray(data.rooms)) {
+        this.rooms = data.rooms;
+      }
+      if (Array.isArray(data.users) && data.users.length > 0) {
         this.users = data.users;
       }
-      if (data.events && data.events.length > 0) {
+      if (Array.isArray(data.events)) {
         this.events = data.events;
       }
-      if (data.eventBookings && data.eventBookings.length > 0) {
+      if (Array.isArray(data.eventBookings)) {
         this.eventBookings = data.eventBookings;
       }
-      if (data.galleryItems && data.galleryItems.length > 0) {
+      if (Array.isArray(data.galleryItems)) {
         this.galleryItems = data.galleryItems;
       }
 
@@ -402,13 +407,9 @@ class Store {
       // Sync the exported PHYSICAL_ROOMS so existing code (timeline, availability) works
       PHYSICAL_ROOMS = this.rooms;
 
-      const storedGallery = await getStoredGalleryItems();
-      if ((!data.galleryItems || data.galleryItems.length === 0) && storedGallery && storedGallery.length > 0) {
-        this.galleryItems = storedGallery;
-      }
-
       this.hasHydratedRemoteData = true;
       this.save();
+      this.notify();
     } catch (err) {
       console.warn("Failed to load initial data from Supabase, using cache:", err);
       this.ensureAdminUser();
@@ -632,7 +633,7 @@ class Store {
   }
 
   async deleteLocation(id: string): Promise<{ success: boolean; error?: string }> {
-    const loc = this.locations.find((l) => l.id === id);
+    const loc = this.locations.find((l) => l.id === id || l.key === id);
     if (!loc) return { success: false, error: "Location not found" };
     // Check if any rooms exist at this location
     const roomsAtLoc = this.rooms.filter((r) => r.property === loc.key);
@@ -642,14 +643,15 @@ class Store {
         error: `Cannot delete — ${roomsAtLoc.length} room(s) still assigned to this location. Remove them first.`,
       };
     }
+    this.locations = this.locations.filter((l) => l.id !== loc.id && l.key !== loc.key);
+    this.save();
+    this.notify();
     try {
-      await deleteLocationDb({ data: { id } });
-      this.locations = this.locations.filter((l) => l.id !== id);
-      this.save();
-      return { success: true };
+      await deleteLocationDb({ data: { id: loc.id } });
     } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
+      console.warn("Location delete DB sync note:", err);
     }
+    return { success: true };
   }
 
   updateLocationPhotos(keyOrId: string, photos: string[]): boolean {
