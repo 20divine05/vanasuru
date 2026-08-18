@@ -535,7 +535,7 @@ export const verifyAdvancePayment = createServerFn({ method: "POST" })
   });
 
 // Unified initial store loader
-export const getInitialStoreData = createServerFn({ method: "GET" }).handler(async () => {
+export const getInitialStoreData = createServerFn({ method: "POST" }).handler(async () => {
   const [
     bookingsResult,
     locationsResult,
