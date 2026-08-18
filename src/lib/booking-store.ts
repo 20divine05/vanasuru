@@ -319,7 +319,7 @@ class Store {
     if (this.initPromise && !force) return this.initPromise;
 
     const now = Date.now();
-    if (!force && (this.hasHydratedRemoteData || now - this.lastInitAttempt < 30_000)) return;
+    if (!force && this.hasHydratedRemoteData && now - this.lastInitAttempt < 3_000) return;
     this.lastInitAttempt = now;
 
     this.initPromise = this.hydrateRemoteData().finally(() => {
@@ -1521,7 +1521,7 @@ export function useBookingStore() {
         eventBookings: bookingStore.getEventBookings(),
       });
     });
-    void bookingStore.init();
+    void bookingStore.init(true);
     return unsubscribe;
   }, []);
 
