@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import {
   getInitialStoreData,
   registerUserDb,
+  updateUserPasswordDb,
   addLocationDb,
+  syncLocationDb,
   deleteLocationDb,
   addRoomDb,
   updateRoomDb,
@@ -10,8 +12,13 @@ import {
   updateRoomAdvanceDb,
   syncBookingDb,
   deleteBookingDb,
+  syncEventDb,
+  deleteEventDb,
+  syncEventBookingDb,
   deleteEventBookingDb,
   deleteAllBookingsDb,
+  syncGalleryDb,
+  deleteGalleryDb,
 } from "./booking-api";
 import {
   sendBookingConfirmationEmail,
@@ -151,6 +158,8 @@ export interface Booking {
   adults: number;
   children: number;
   roomsCount: number;
+  pricePerNight?: number;
+  totalNights?: number;
   guestDetails: {
     firstName: string;
     lastName: string;
@@ -296,20 +305,21 @@ class Store {
       this.users[adminIndex] = {
         ...this.users[adminIndex],
         email: "vanasurumys@gmail.com",
-        password: "vanasuru",
+        password: this.users[adminIndex].password || "vanasuru",
         role: "admin",
       };
     } else {
       this.users.unshift(DEFAULT_ADMIN_USER);
+      void registerUserDb({ data: DEFAULT_ADMIN_USER }).catch(() => {});
     }
   }
 
-  async init() {
+  async init(force = false) {
     if (!isBrowser) return;
-    if (this.initPromise) return this.initPromise;
+    if (this.initPromise && !force) return this.initPromise;
 
     const now = Date.now();
-    if (this.hasHydratedRemoteData || now - this.lastInitAttempt < 30_000) return;
+    if (!force && (this.hasHydratedRemoteData || now - this.lastInitAttempt < 30_000)) return;
     this.lastInitAttempt = now;
 
     this.initPromise = this.hydrateRemoteData().finally(() => {
@@ -373,9 +383,18 @@ class Store {
 
       this.bookings = mergedBookings.filter((b) => !this.deletedBookingIds.has(b.id));
       this.locations = data.locations && data.locations.length > 0 ? data.locations : this.locations;
-      this.rooms = data.rooms || [];
+      this.rooms = data.rooms && data.rooms.length > 0 ? data.rooms : this.rooms;
       if (data.users && data.users.length > 0) {
         this.users = data.users;
+      }
+      if (data.events && data.events.length > 0) {
+        this.events = data.events;
+      }
+      if (data.eventBookings && data.eventBookings.length > 0) {
+        this.eventBookings = data.eventBookings;
+      }
+      if (data.galleryItems && data.galleryItems.length > 0) {
+        this.galleryItems = data.galleryItems;
       }
 
       this.ensureAdminUser();
@@ -384,7 +403,7 @@ class Store {
       PHYSICAL_ROOMS = this.rooms;
 
       const storedGallery = await getStoredGalleryItems();
-      if (storedGallery && storedGallery.length > 0) {
+      if ((!data.galleryItems || data.galleryItems.length === 0) && storedGallery && storedGallery.length > 0) {
         this.galleryItems = storedGallery;
       }
 
@@ -588,13 +607,27 @@ class Store {
       photos: loc.photos || [],
       id: "loc-" + Math.random().toString(36).substr(2, 9),
     };
+    this.locations.push(newLoc);
+    this.save();
     try {
-      await addLocationDb({ data: newLoc });
-      this.locations.push(newLoc);
-      this.save();
+      await addLocationDb({
+        data: {
+          id: newLoc.id,
+          key: newLoc.key,
+          name: newLoc.name,
+          address: newLoc.address,
+          phone: newLoc.phone,
+          email: newLoc.email,
+          tagline: newLoc.tagline,
+          photos: newLoc.photos,
+          map_embed_url: newLoc.mapEmbedUrl,
+          mapEmbedUrl: newLoc.mapEmbedUrl,
+        },
+      });
       return { success: true };
     } catch (err: unknown) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
+      console.warn("Location add DB sync note:", err);
+      return { success: true };
     }
   }
 
@@ -624,6 +657,7 @@ class Store {
     if (loc) {
       loc.photos = photos;
       this.save();
+      void syncLocationDb({ data: { location: loc } }).catch(() => {});
       return true;
     }
     return false;
@@ -634,6 +668,7 @@ class Store {
     if (loc) {
       loc.mapEmbedUrl = extractMapEmbedUrl(mapEmbedUrl);
       this.save();
+      void syncLocationDb({ data: { location: loc } }).catch(() => {});
       return true;
     }
     return false;
@@ -644,6 +679,21 @@ class Store {
     if (room) {
       room.photos = photos;
       this.save();
+      void updateRoomDb({
+        data: {
+          id: room.id,
+          name: room.name,
+          property: room.property,
+          room_type_slug: room.roomTypeSlug,
+          advance_amount: room.advanceAmount ?? 1,
+          price_per_night: room.pricePerNight ?? 3500,
+          photos: room.photos ?? [],
+          max_guests: room.maxGuests ?? 4,
+          max_adults: room.maxAdults ?? 2,
+          max_kids: room.maxKids ?? 1,
+          bed_type: room.bedType || "King Bed",
+        },
+      }).catch(() => {});
       return true;
     }
     return false;
@@ -662,6 +712,7 @@ class Store {
     };
     this.events = [newEvent, ...this.events];
     this.save();
+    void syncEventDb({ data: { event: newEvent } }).catch(() => {});
     return newEvent;
   }
 
@@ -670,6 +721,7 @@ class Store {
     this.events = this.events.filter((e) => e.id !== id);
     if (this.events.length !== initLen) {
       this.save();
+      void deleteEventDb({ data: { id } }).catch(() => {});
       return true;
     }
     return false;
@@ -680,6 +732,7 @@ class Store {
     if (event) {
       event.isHighlighted = !event.isHighlighted;
       this.save();
+      void syncEventDb({ data: { event } }).catch(() => {});
       return true;
     }
     return false;
@@ -727,6 +780,7 @@ class Store {
     this.eventBookings = [newBooking, ...this.eventBookings];
     this.save();
     this.notify();
+    void syncEventBookingDb({ data: { booking: newBooking } }).catch(() => {});
     return { success: true, booking: newBooking };
   }
 
@@ -736,6 +790,7 @@ class Store {
       eb.status = status;
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -748,6 +803,7 @@ class Store {
       eb.checkedInAt = new Date().toISOString();
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -760,6 +816,7 @@ class Store {
       eb.checkedOutAt = new Date().toISOString();
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -775,6 +832,7 @@ class Store {
       });
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -792,6 +850,7 @@ class Store {
       });
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -803,6 +862,7 @@ class Store {
       eb.customGrandTotal = customTotal;
       this.save();
       this.notify();
+      void syncEventBookingDb({ data: { booking: eb } }).catch(() => {});
       return true;
     }
     return false;
@@ -980,6 +1040,7 @@ class Store {
       role: user.role,
     };
     this.save();
+    void this.init(true);
     return { success: true };
   }
 
@@ -1009,6 +1070,7 @@ class Store {
       role: user.role,
     };
     this.save();
+    void updateUserPasswordDb({ data: { email: formattedEmail, password: newPass } }).catch(() => {});
     return { success: true };
   }
 
@@ -1029,6 +1091,7 @@ class Store {
       role: user.role,
     };
     this.save();
+    void updateUserPasswordDb({ data: { email: formattedEmail, password: newPass } }).catch(() => {});
     return { success: true };
   }
 
@@ -1388,6 +1451,7 @@ class Store {
     };
     this.galleryItems = [newItem, ...this.galleryItems];
     this.save();
+    void syncGalleryDb({ data: { item: newItem } }).catch(() => {});
     return newItem;
   }
 
@@ -1396,6 +1460,7 @@ class Store {
     this.galleryItems = this.galleryItems.filter((g) => g.id !== id);
     if (this.galleryItems.length !== initialLength) {
       this.save();
+      void deleteGalleryDb({ data: { id } }).catch(() => {});
       return true;
     }
     return false;
@@ -1460,7 +1525,7 @@ export function useBookingStore() {
 
   return {
     ...state,
-    init: () => bookingStore.init(),
+    init: (force?: boolean) => bookingStore.init(force),
     login: (e: string, p: string) => bookingStore.login(e, p),
     logout: () => bookingStore.logout(),
     register: (n: string, e: string, p: string) => bookingStore.register(n, e, p),

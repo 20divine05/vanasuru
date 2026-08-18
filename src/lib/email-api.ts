@@ -127,7 +127,7 @@ export const sendBookingConfirmationEmail = createServerFn({ method: "POST" })
 
     if (!config) {
       console.log(`\n======================================================`);
-      console.log(`[DEV MODE] Confirmation Email to ${customerEmail} & ${config?.adminEmail || "Admin"}:`);
+      console.log(`[DEV MODE] Confirmation Email to ${customerEmail} & Admin (vanasurumys@gmail.com):`);
       console.log(`Booking ID: ${booking.id} | Property: ${propertyName} | Item: ${roomName}`);
       console.log(`======================================================\n`);
       return { success: true, isDevFallback: true };
@@ -539,7 +539,7 @@ export const sendBillInvoiceEmail = createServerFn({ method: "POST" })
     if (!config) {
       console.log(`\n======================================================`);
       console.log(
-        `[DEV MODE] Tax Invoice Email sent to ${customerEmail} & ${config?.adminEmail || "Admin"}: Invoice #${invoiceNo} | Total: Rs. ${grandTotal}`,
+        `[DEV MODE] Tax Invoice Email sent to ${customerEmail} & Admin (vanasurumys@gmail.com): Invoice #${invoiceNo} | Total: Rs. ${grandTotal}`,
       );
       console.log(`======================================================\n`);
       return { success: true, isDevFallback: true };

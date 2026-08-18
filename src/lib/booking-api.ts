@@ -536,17 +536,31 @@ export const verifyAdvancePayment = createServerFn({ method: "POST" })
 
 // Unified initial store loader
 export const getInitialStoreData = createServerFn({ method: "GET" }).handler(async () => {
-  const [bookingsResult, locationsResult, roomsResult, usersResult] = await Promise.all([
+  const [
+    bookingsResult,
+    locationsResult,
+    roomsResult,
+    usersResult,
+    eventsResult,
+    eventBookingsResult,
+    galleryResult,
+  ] = await Promise.all([
     supabase.from("bookings").select("*"),
     supabase.from("locations").select("*"),
     supabase.from("rooms").select("*"),
     supabase.from("users").select("*"),
+    supabase.from("events").select("*"),
+    supabase.from("event_bookings").select("*"),
+    supabase.from("gallery_items").select("*"),
   ]);
 
   const bookings = bookingsResult.data || [];
   const locations = locationsResult.data || [];
   const rooms = roomsResult.data || [];
   const users = usersResult.data || [];
+  const events = eventsResult.data || [];
+  const eventBookings = eventBookingsResult.data || [];
+  const galleryItems = galleryResult.data || [];
 
   return {
     bookings: bookings.map(fromSupabaseBooking),
@@ -558,6 +572,8 @@ export const getInitialStoreData = createServerFn({ method: "GET" }).handler(asy
       phone: String(row.phone || ""),
       email: String(row.email || ""),
       tagline: String(row.tagline || ""),
+      photos: Array.isArray(row.photos) ? row.photos.map(String) : [],
+      mapEmbedUrl: row.map_embed_url ? String(row.map_embed_url) : undefined,
     })),
     rooms: rooms.map((row: Record<string, unknown>) => ({
       id: String(row.id || ""),
@@ -579,6 +595,48 @@ export const getInitialStoreData = createServerFn({ method: "GET" }).handler(asy
       name: String(row.name || ""),
       role: (row.role === "admin" ? "admin" : "client") as "client" | "admin",
     })),
+    events: events.map((row: Record<string, unknown>) => ({
+      id: String(row.id || ""),
+      title: String(row.title || ""),
+      description: String(row.description || ""),
+      property: String(row.property || ""),
+      venue: String(row.venue || ""),
+      date: String(row.date || ""),
+      capacity: Number(row.capacity ?? 100),
+      price: Number(row.price ?? 0),
+      image: String(row.image || ""),
+      photos: Array.isArray(row.photos) ? row.photos.map(String) : [],
+      isHighlighted: Boolean(row.is_highlighted),
+      createdAt: String(row.created_at || new Date().toISOString()),
+    })),
+    eventBookings: eventBookings.map((row: Record<string, unknown>) => ({
+      id: String(row.id || ""),
+      eventId: row.event_id ? String(row.event_id) : undefined,
+      eventTitle: String(row.event_title || ""),
+      property: String(row.property || ""),
+      venue: String(row.venue || ""),
+      userEmail: String(row.user_email || ""),
+      userName: String(row.user_name || ""),
+      eventDate: String(row.event_date || ""),
+      guestsCount: Number(row.guests_count ?? 1),
+      guestDetails: (row.guest_details as any) || {},
+      status: (row.status || "confirmed") as any,
+      totalAmount: row.total_amount != null ? Number(row.total_amount) : undefined,
+      advanceAmount: row.advance_amount != null ? Number(row.advance_amount) : undefined,
+      paymentsHistory: Array.isArray(row.payments_history) ? row.payments_history : undefined,
+      extraCharges: Array.isArray(row.extra_charges) ? row.extra_charges : undefined,
+      customGrandTotal: row.custom_grand_total != null ? Number(row.custom_grand_total) : undefined,
+      checkedInAt: row.checked_in_at ? String(row.checked_in_at) : undefined,
+      checkedOutAt: row.checked_out_at ? String(row.checked_out_at) : undefined,
+      createdAt: String(row.created_at || new Date().toISOString()),
+    })),
+    galleryItems: galleryItems.map((row: Record<string, unknown>) => ({
+      id: String(row.id || ""),
+      src: String(row.src || ""),
+      tag: String(row.tag || "General"),
+      category: String(row.category || "Rooms") as any,
+      title: row.title ? String(row.title) : undefined,
+    })),
   };
 });
 
@@ -594,7 +652,7 @@ export const registerUserDb = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const { error } = await supabase.from("users").insert({
+    const { error } = await supabase.from("users").upsert({
       ...data,
       email: data.email.toLowerCase().trim(),
     });
@@ -602,30 +660,80 @@ export const registerUserDb = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-// Locations CRUD
-export const addLocationDb = createServerFn({ method: "POST" })
+export const updateUserPasswordDb = createServerFn({ method: "POST" })
   .validator(
     z.object({
-      id: z.string(),
-      key: z.string(),
-      name: z.string(),
-      address: z.string(),
-      phone: z.string(),
       email: z.string(),
-      tagline: z.string(),
+      password: z.string(),
     }),
   )
   .handler(async ({ data }) => {
-    const { error } = await supabase.from("locations").insert(data);
-    if (error) throw new Error(error.message);
+    const formattedEmail = data.email.toLowerCase().trim();
+    const { error } = await supabase
+      .from("users")
+      .update({ password: data.password })
+      .eq("email", formattedEmail);
+    if (error) {
+      console.warn("Supabase update password note:", error.message);
+    }
+    return { success: true };
+  });
+
+// Locations CRUD
+export const addLocationDb = createServerFn({ method: "POST" })
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const loc = data?.data || data || {};
+    const payload = {
+      id: loc.id,
+      key: loc.key,
+      name: loc.name,
+      address: loc.address,
+      phone: loc.phone || "",
+      email: loc.email || "",
+      tagline: loc.tagline || "",
+      photos: loc.photos || [],
+      map_embed_url: loc.map_embed_url || loc.mapEmbedUrl || null,
+    };
+    const { error } = await supabase.from("locations").upsert(payload);
+    if (error) {
+      console.warn("Supabase add location warning:", error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  });
+
+export const syncLocationDb = createServerFn({ method: "POST" })
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const loc = data?.location || data?.data || data || {};
+    const payload = {
+      id: loc.id,
+      key: loc.key,
+      name: loc.name,
+      address: loc.address,
+      phone: loc.phone || "",
+      email: loc.email || "",
+      tagline: loc.tagline || "",
+      photos: loc.photos || [],
+      map_embed_url: loc.mapEmbedUrl || loc.map_embed_url || null,
+    };
+    const { error } = await supabase.from("locations").upsert(payload);
+    if (error) {
+      console.warn("Supabase sync location note:", error.message);
+    }
     return { success: true };
   });
 
 export const deleteLocationDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("locations").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+  .validator(z.any())
+  .handler(async ({ data }: { data: any }) => {
+    const id = data?.id || data?.data?.id || "";
+    const { error } = await supabase.from("locations").delete().eq("id", id);
+    if (error) {
+      console.warn("Supabase delete location note:", error.message);
+      return { success: false, error: error.message };
+    }
     return { success: true };
   });
 
@@ -779,6 +887,137 @@ export const updateRoomAdvanceDb = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+// Events CRUD
+export const syncEventDb = createServerFn({ method: "POST" })
+  .validator(z.object({ event: z.any() }))
+  .handler(async ({ data }) => {
+    const evt = data.event;
+    const payload = {
+      id: evt.id,
+      title: evt.title,
+      description: evt.description,
+      property: evt.property,
+      venue: evt.venue,
+      date: evt.date,
+      capacity: evt.capacity,
+      price: evt.price,
+      image: evt.image,
+      photos: evt.photos || [],
+      is_highlighted: evt.isHighlighted ?? false,
+      created_at: evt.createdAt || new Date().toISOString(),
+    };
+    const { error } = await supabase.from("events").upsert(payload);
+    if (error) console.warn("Supabase sync event note:", error.message);
+    return { success: true };
+  });
+
+export const deleteEventDb = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const { error } = await supabase.from("events").delete().eq("id", data.id);
+    if (error) console.warn("Supabase delete event note:", error.message);
+    return { success: true };
+  });
+
+// Event Bookings CRUD
+const OPTIONAL_EVENT_BOOKING_COLUMNS = [
+  "total_amount",
+  "advance_amount",
+  "payments_history",
+  "extra_charges",
+  "custom_grand_total",
+  "checked_in_at",
+  "checked_out_at",
+];
+
+export const syncEventBookingDb = createServerFn({ method: "POST" })
+  .validator(z.object({ booking: z.any() }))
+  .handler(async ({ data }) => {
+    const eb = data.booking;
+    const currentPayload: Record<string, unknown> = {
+      id: eb.id,
+      event_id: eb.eventId || null,
+      event_title: eb.eventTitle,
+      property: eb.property,
+      venue: eb.venue,
+      user_email: eb.userEmail,
+      user_name: eb.userName,
+      event_date: eb.eventDate,
+      guests_count: eb.guestsCount,
+      guest_details: eb.guestDetails,
+      status: eb.status,
+      total_amount: eb.totalAmount ?? null,
+      advance_amount: eb.advanceAmount ?? null,
+      payments_history: eb.paymentsHistory ?? null,
+      extra_charges: eb.extraCharges ?? null,
+      custom_grand_total: eb.customGrandTotal ?? null,
+      checked_in_at: eb.checkedInAt ?? null,
+      checked_out_at: eb.checkedOutAt ?? null,
+      created_at: eb.createdAt || new Date().toISOString(),
+    };
+
+    while (true) {
+      const { error } = await supabase.from("event_bookings").upsert(currentPayload);
+      if (!error) return { success: true };
+
+      const errMsg = (error.message || "").toLowerCase();
+      let strippedAny = false;
+      for (const col of OPTIONAL_EVENT_BOOKING_COLUMNS) {
+        if (col in currentPayload && errMsg.includes(col)) {
+          delete currentPayload[col];
+          strippedAny = true;
+        }
+      }
+      if (!strippedAny && (errMsg.includes("schema cache") || errMsg.includes("column"))) {
+        for (const col of OPTIONAL_EVENT_BOOKING_COLUMNS) {
+          if (col in currentPayload) {
+            delete currentPayload[col];
+            strippedAny = true;
+          }
+        }
+      }
+      if (!strippedAny) {
+        console.warn("Supabase event booking insert note:", error.message);
+        return { success: false, error: error.message };
+      }
+    }
+  });
+
+export const deleteEventBookingDb = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const { error } = await supabase.from("event_bookings").delete().eq("id", data.id);
+    if (error) {
+      console.warn("Supabase delete event booking note:", error.message);
+    }
+    return { success: true };
+  });
+
+// Gallery Items CRUD
+export const syncGalleryDb = createServerFn({ method: "POST" })
+  .validator(z.object({ item: z.any() }))
+  .handler(async ({ data }) => {
+    const g = data.item;
+    const payload = {
+      id: g.id,
+      src: g.src,
+      tag: g.tag,
+      category: g.category,
+      title: g.title || null,
+    };
+    const { error } = await supabase.from("gallery_items").upsert(payload);
+    if (error) console.warn("Supabase sync gallery item note:", error.message);
+    return { success: true };
+  });
+
+export const deleteGalleryDb = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string() }))
+  .handler(async ({ data }) => {
+    const { error } = await supabase.from("gallery_items").delete().eq("id", data.id);
+    if (error) console.warn("Supabase delete gallery item note:", error.message);
+    return { success: true };
+  });
+
 export const uploadImageToProjectDb = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -833,13 +1072,4 @@ export const uploadImageToProjectDb = createServerFn({ method: "POST" })
     }
   });
 
-export const deleteEventBookingDb = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const { error } = await supabase.from("event_bookings").delete().eq("id", data.id);
-    if (error) {
-      console.warn("Supabase delete event booking note:", error.message);
-    }
-    return { success: true };
-  });
 

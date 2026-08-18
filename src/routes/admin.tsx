@@ -57,6 +57,7 @@ import {
   LogOut,
   PlusCircle,
   Clock,
+  Camera,
 } from "lucide-react";
 import { format, addDays, parseISO, differenceInDays } from "date-fns";
 
@@ -128,10 +129,12 @@ function DashboardPage() {
     deleteAllBookings,
   } = store;
 
-  // Redirect to login if not logged in
+  // Redirect to login if not logged in & sync latest data from Supabase
   useEffect(() => {
     if (!currentUser) {
       navigate({ to: "/login", search: { redirectTo: "/admin" } });
+    } else {
+      void store.init(true);
     }
   }, [currentUser, navigate]);
 
@@ -190,6 +193,7 @@ function DashboardPage() {
         <ClientDashboard
           currentUser={currentUser}
           bookings={bookings}
+          rooms={rooms}
           eventBookings={eventBookings}
           cancelBooking={(id) => updateBookingStatus(id, "cancelled")}
         />
@@ -5413,7 +5417,7 @@ function EventsManager({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setInvoiceBooking(eb)}
+                          onClick={() => onViewBill(eb)}
                           className="px-2 py-1 bg-emerald-800 hover:bg-emerald-900 text-white text-[10px] font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1"
                           title="Download Tax Invoice Bill PDF"
                         >
@@ -5566,11 +5570,13 @@ function MetricCard({
 function ClientDashboard({
   currentUser,
   bookings,
+  rooms = [],
   eventBookings = [],
   cancelBooking,
 }: {
   currentUser: User;
   bookings: Booking[];
+  rooms?: PhysicalRoom[];
   eventBookings?: EventBooking[];
   cancelBooking: (id: string) => boolean;
 }) {
