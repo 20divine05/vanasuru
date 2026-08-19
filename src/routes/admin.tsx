@@ -303,6 +303,7 @@ function ReportsManagement({
   locations: Location[];
   onViewBill: (b: Booking | EventBooking) => void;
 }) {
+  const store = useBookingStore();
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<"all" | "room" | "event">("all");
@@ -363,7 +364,7 @@ function ReportsManagement({
       typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
         ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
         : b.totalNights || 1;
-    const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+    const pricePerNight = getBookingPricePerNight(b, store.getRooms());
     const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
     let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
@@ -467,7 +468,7 @@ function ReportsManagement({
         typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
           ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
           : b.totalNights || 1;
-      const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+      const pricePerNight = getBookingPricePerNight(b, store.getRooms());
       const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
       let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
@@ -848,7 +849,7 @@ function ReportsManagement({
                   typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
                     ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
                     : b.totalNights || 1;
-                const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+                const pricePerNight = getBookingPricePerNight(b, store.getRooms());
                 const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
                 let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;

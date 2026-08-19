@@ -25,7 +25,7 @@ import {
   sendCheckInEmail,
   sendCheckOutEmail,
 } from "./email-api";
-import { isPropertyMatch } from "./site-data";
+import { ROOMS, isPropertyMatch } from "./site-data";
 
 export interface User {
   id: string;

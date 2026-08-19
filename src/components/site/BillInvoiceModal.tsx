@@ -47,7 +47,7 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
     }
   }
   if (!pricePerNight && !isEventBooking) {
-    pricePerNight = getBookingPricePerNight(booking as Booking, rooms);
+    pricePerNight = getBookingPricePerNight(booking as Booking, store.rooms);
   }
 
   // Calculate nights
@@ -73,13 +73,6 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
   const extraChargesList = booking.extraCharges || [];
   const extraChargesSum = extraChargesList.reduce((sum, c) => sum + c.amount, 0);
 
-  const baseGrandTotal =
-    booking.customGrandTotal !== undefined && booking.customGrandTotal !== null
-      ? booking.customGrandTotal
-      : Math.max(calculatedBaseGrandTotal, totalPaid);
-
-  const grandTotal = baseGrandTotal + extraChargesSum;
-
   let initialAdvance = isEventBooking
     ? ((booking as EventBooking).advanceAmount || 0)
     : (typeof (booking as Booking).payment?.amountPaid === "number" ? (booking as Booking).payment!.amountPaid : 0);
@@ -92,6 +85,13 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
 
   const partialPaymentsTotal = (booking.paymentsHistory || []).reduce((sum, p) => sum + p.amount, 0);
   const totalPaid = initialAdvance + partialPaymentsTotal;
+
+  const baseGrandTotal =
+    booking.customGrandTotal !== undefined && booking.customGrandTotal !== null
+      ? booking.customGrandTotal
+      : Math.max(calculatedBaseGrandTotal, totalPaid);
+
+  const grandTotal = baseGrandTotal + extraChargesSum;
   const balanceDue = Math.max(0, grandTotal - totalPaid);
 
   const invoiceNo = `INV-${booking.id.replace("BK-", "").replace("EVB-", "EVT-").replace("BLOCK-", "ADM")}`;
