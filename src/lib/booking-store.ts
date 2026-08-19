@@ -714,6 +714,7 @@ class Store {
     };
     this.events = [newEvent, ...this.events];
     this.save();
+    this.notify();
     void syncEventDb({ data: { event: newEvent } }).catch(() => {});
     return newEvent;
   }
@@ -723,6 +724,7 @@ class Store {
     this.events = this.events.filter((e) => e.id !== id);
     if (this.events.length !== initLen) {
       this.save();
+      this.notify();
       void deleteEventDb({ data: { id } }).catch(() => {});
       return true;
     }
@@ -734,6 +736,7 @@ class Store {
     if (event) {
       event.isHighlighted = !event.isHighlighted;
       this.save();
+      this.notify();
       void syncEventDb({ data: { event } }).catch(() => {});
       return true;
     }

@@ -595,20 +595,24 @@ export const getInitialStoreData = createServerFn({ method: "POST" }).handler(as
       name: String(row.name || ""),
       role: (row.role === "admin" ? "admin" : "client") as "client" | "admin",
     })),
-    events: events.map((row: Record<string, unknown>) => ({
-      id: String(row.id || ""),
-      title: String(row.title || ""),
-      description: String(row.description || ""),
-      property: String(row.property || ""),
-      venue: String(row.venue || ""),
-      date: String(row.date || ""),
-      capacity: Number(row.capacity ?? 100),
-      price: Number(row.price ?? 0),
-      image: String(row.image || ""),
-      photos: Array.isArray(row.photos) ? row.photos.map(String) : [],
-      isHighlighted: Boolean(row.is_highlighted),
-      createdAt: String(row.created_at || new Date().toISOString()),
-    })),
+    events: events.map((row: Record<string, unknown>) => {
+      const capNum = row.capacity != null && row.capacity !== "" ? Number(row.capacity) : 100;
+      const prcNum = row.price != null && row.price !== "" ? Number(row.price) : 0;
+      return {
+        id: String(row.id || ""),
+        title: String(row.title || ""),
+        description: String(row.description || ""),
+        property: String(row.property || ""),
+        venue: String(row.venue || ""),
+        date: String(row.date || "Available Daily"),
+        capacity: isNaN(capNum) ? 100 : capNum,
+        price: isNaN(prcNum) ? 0 : prcNum,
+        image: String(row.image || row.image_url || ""),
+        photos: Array.isArray(row.photos) ? row.photos.map(String) : [],
+        isHighlighted: Boolean(row.is_highlighted),
+        createdAt: String(row.created_at || new Date().toISOString()),
+      };
+    }),
     eventBookings: eventBookings.map((row: Record<string, unknown>) => ({
       id: String(row.id || ""),
       eventId: row.event_id ? String(row.event_id) : undefined,
@@ -863,25 +867,65 @@ export const updateRoomAdvanceDb = createServerFn({ method: "POST" })
   });
 
 // Events CRUD
+const OPTIONAL_EVENT_COLUMNS = [
+  "price",
+  "date",
+  "photos",
+  "image",
+  "image_url",
+  "tag",
+  "capacity",
+];
+
 export const syncEventDb = createServerFn({ method: "POST" })
   .validator(z.any())
   .handler(async ({ data }: { data: any }) => {
     const evt = data?.event || data?.data || data || {};
-    const payload = {
+    const currentPayload: Record<string, unknown> = {
       id: evt.id,
       title: evt.title,
       description: evt.description || "",
       property: evt.property,
       venue: evt.venue,
-      capacity: evt.capacity || "",
+      date: evt.date || "Available Daily",
+      capacity: String(evt.capacity ?? 100),
+      price: Number(evt.price ?? 0),
       tag: evt.tag || "Wedding",
+      image: evt.image || evt.image_url || evt.imageUrl || "",
       image_url: evt.image_url || evt.imageUrl || evt.image || "",
+      photos: evt.photos || [],
       is_highlighted: evt.is_highlighted ?? evt.isHighlighted ?? false,
       created_at: evt.created_at || evt.createdAt || new Date().toISOString(),
     };
-    const { error } = await supabase.from("events").upsert(payload);
-    if (error) console.warn("Supabase sync event note:", error.message);
-    return { success: true };
+
+    while (true) {
+      const { error } = await supabase.from("events").upsert(currentPayload);
+      if (!error) return { success: true };
+
+      const errMsg = (error.message || "").toLowerCase();
+      let strippedAny = false;
+
+      for (const col of OPTIONAL_EVENT_COLUMNS) {
+        if (col in currentPayload && errMsg.includes(col)) {
+          delete currentPayload[col];
+          strippedAny = true;
+        }
+      }
+
+      if (!strippedAny && (errMsg.includes("schema cache") || errMsg.includes("column"))) {
+        for (const col of OPTIONAL_EVENT_COLUMNS) {
+          if (col in currentPayload) {
+            delete currentPayload[col];
+            strippedAny = true;
+          }
+        }
+      }
+
+      if (!strippedAny) {
+        console.warn("Supabase sync event note:", error.message);
+        return { success: false, error: error.message };
+      }
+    }
   });
 
 export const deleteEventDb = createServerFn({ method: "POST" })

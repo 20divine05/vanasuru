@@ -77,9 +77,12 @@ create table if not exists public.events (
   property text not null,
   venue text not null,
   description text not null,
-  capacity text not null,
-  tag text not null,
-  image_url text not null,
+  capacity text not null default '100',
+  price numeric not null default 0,
+  date text not null default 'Available Daily',
+  tag text not null default 'Wedding',
+  image_url text,
+  photos jsonb default '[]'::jsonb,
   is_highlighted boolean not null default false,
   created_at timestamptz not null default now()
 );
