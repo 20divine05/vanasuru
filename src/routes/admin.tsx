@@ -364,7 +364,7 @@ function ReportsManagement({
       typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
         ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
         : b.totalNights || 1;
-    const pricePerNight = getBookingPricePerNight(b, store.getRooms());
+    const pricePerNight = getBookingPricePerNight(b, store.rooms);
     const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
     let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
@@ -468,7 +468,7 @@ function ReportsManagement({
         typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
           ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
           : b.totalNights || 1;
-      const pricePerNight = getBookingPricePerNight(b, store.getRooms());
+      const pricePerNight = getBookingPricePerNight(b, store.rooms);
       const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
       let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
@@ -849,7 +849,7 @@ function ReportsManagement({
                   typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
                     ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
                     : b.totalNights || 1;
-                const pricePerNight = getBookingPricePerNight(b, store.getRooms());
+                const pricePerNight = getBookingPricePerNight(b, store.rooms);
                 const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
                 let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;

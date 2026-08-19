@@ -401,7 +401,7 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
                     {isEventBooking ? (booking as EventBooking).guestsCount : ((booking as Booking).roomsCount || 1)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono">
-                    {isEventBooking ? "Flat Banquet Fee" : `Rs. ${pricePerNight.toLocaleString("en-IN")}`}
+                    {isEventBooking ? "Flat Banquet Fee" : `Rs. ${(pricePerNight || 0).toLocaleString("en-IN")}`}
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-medium">
                     Rs. {baseItemTotal.toLocaleString("en-IN")}
