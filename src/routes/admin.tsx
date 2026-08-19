@@ -23,6 +23,7 @@ import {
 import { SiteShell } from "@/components/site/SiteShell";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { BillInvoiceModal } from "@/components/site/BillInvoiceModal";
+import { SalarySlipGenerator } from "@/routes/salary-slip";
 import {
   Check,
   X,
@@ -2497,29 +2498,7 @@ function AdminConsole({
       )}
 
       {activeTab === "salary" && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center bg-card border border-border/60 p-6 shadow-sm">
-            <div>
-              <h3 className="font-serif text-2xl text-[color:var(--forest)] font-bold flex items-center gap-2">
-                <FileText size={22} className="text-[color:var(--gold)]" /> Employee Monthly Salary Slip Generator
-              </h3>
-              <p className="text-xs text-charcoal/60 mt-1">
-                Generate, edit, and print official employee salary slips for MA SHRI VENTURES PRIVATE LIMITED.
-              </p>
-            </div>
-            <Link
-              to="/salary-slip"
-              className="bg-[color:var(--forest)] text-ivory hover:bg-[color:var(--gold)] hover:text-black font-semibold text-xs uppercase px-5 py-2.5 tracking-wider transition-colors"
-            >
-              Open Fullscreen Generator ↗
-            </Link>
-          </div>
-          <iframe
-            src="/salary-slip"
-            title="Salary Slip Generator"
-            className="w-full min-h-[900px] border border-border/60 rounded bg-background shadow-inner"
-          />
-        </div>
+        <SalarySlipGenerator showBackLink={false} />
       )}
 
       <BillInvoiceModal

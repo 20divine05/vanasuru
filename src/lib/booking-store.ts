@@ -393,7 +393,29 @@ class Store {
         this.users = data.users;
       }
       if (Array.isArray(data.events)) {
-        this.events = data.events;
+        const localEvtMap = new Map<string, ResortEvent>();
+        (this.events || []).forEach((e) => localEvtMap.set(e.id, e));
+
+        this.events = data.events.map((remoteEvt) => {
+          const localEvt = localEvtMap.get(remoteEvt.id);
+          const price =
+            remoteEvt.price && remoteEvt.price > 0
+              ? remoteEvt.price
+              : localEvt?.price && localEvt.price > 0
+                ? localEvt.price
+                : remoteEvt.price || 0;
+          const capacity =
+            remoteEvt.capacity && remoteEvt.capacity > 0
+              ? remoteEvt.capacity
+              : localEvt?.capacity && localEvt.capacity > 0
+                ? localEvt.capacity
+                : remoteEvt.capacity || 100;
+          return {
+            ...remoteEvt,
+            price,
+            capacity,
+          };
+        });
       }
       if (Array.isArray(data.eventBookings)) {
         this.eventBookings = data.eventBookings;
