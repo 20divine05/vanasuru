@@ -92,6 +92,8 @@ type SupabaseBookingRow = {
   status: Booking["status"];
   checked_in_at?: string | null;
   checked_out_at?: string | null;
+  price_per_night?: number | null;
+  total_nights?: number | null;
   payments_history?: any;
   extra_charges?: any;
   custom_grand_total?: number | null;
@@ -123,6 +125,8 @@ async function getStoredBookings(): Promise<Booking[]> {
 }
 
 const OPTIONAL_BOOKING_COLUMNS = [
+  "price_per_night",
+  "total_nights",
   "checked_in_at",
   "checked_out_at",
   "payments_history",
@@ -182,13 +186,15 @@ function fromSupabaseBooking(row: SupabaseBookingRow): Booking {
     adults: row.adults,
     children: row.children,
     roomsCount: row.rooms_count,
+    pricePerNight: row.price_per_night != null ? Number(row.price_per_night) : undefined,
+    totalNights: row.total_nights != null ? Number(row.total_nights) : undefined,
     guestDetails: row.guest_details,
     status: row.status,
     checkedInAt: row.checked_in_at ?? undefined,
     checkedOutAt: row.checked_out_at ?? undefined,
     paymentsHistory: row.payments_history ?? undefined,
     extraCharges: row.extra_charges ?? undefined,
-    customGrandTotal: row.custom_grand_total ?? undefined,
+    customGrandTotal: row.custom_grand_total != null ? Number(row.custom_grand_total) : undefined,
     emailNotified: row.email_notified ?? undefined,
     createdAt: row.created_at,
     payment: row.payment ?? undefined,
@@ -208,6 +214,8 @@ function toSupabaseBooking(booking: Booking): SupabaseBookingRow {
     adults: booking.adults,
     children: booking.children,
     rooms_count: booking.roomsCount,
+    price_per_night: booking.pricePerNight ?? null,
+    total_nights: booking.totalNights ?? null,
     guest_details: booking.guestDetails,
     status: booking.status,
     checked_in_at: booking.checkedInAt ?? null,

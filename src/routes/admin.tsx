@@ -4,6 +4,7 @@ import {
   useBookingStore,
   PHYSICAL_ROOMS,
   extractMapEmbedUrl,
+  getBookingPricePerNight,
   type Booking,
   type PaymentEntry,
   type PhysicalRoom,
@@ -362,7 +363,8 @@ function ReportsManagement({
       typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
         ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
         : b.totalNights || 1;
-    const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
+    const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+    const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
     let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
     if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -403,7 +405,7 @@ function ReportsManagement({
 
   filteredEventBookings.forEach((eb) => {
     const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-    const baseTotal = eb.totalAmount || 50000;
+    const baseTotal = eb.totalAmount || 0;
 
     const initialAdv = eb.advanceAmount || 0;
     const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
@@ -465,7 +467,8 @@ function ReportsManagement({
         typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
           ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
           : b.totalNights || 1;
-      const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
+      const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+      const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
       let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
       if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -504,7 +507,7 @@ function ReportsManagement({
 
     filteredEventBookings.forEach((eb) => {
       const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-      const baseTotal = eb.totalAmount || 50000;
+      const baseTotal = eb.totalAmount || 0;
       const grandTotal =
         eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
           ? eb.customGrandTotal + extraChargesSum
@@ -845,7 +848,8 @@ function ReportsManagement({
                   typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
                     ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
                     : b.totalNights || 1;
-                const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
+                const pricePerNight = getBookingPricePerNight(b, bookingStore.getRooms());
+                const calculatedBase = pricePerNight * nightsCount * (b.roomsCount || 1);
 
                 let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
                 if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -912,7 +916,7 @@ function ReportsManagement({
 
               {filteredEventBookings.map((eb) => {
                 const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-                const baseTotal = eb.totalAmount || 50000;
+                const baseTotal = eb.totalAmount || 0;
                 const initialAdv = eb.advanceAmount || 0;
                 const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
                 const paid = initialAdv + partials;
@@ -1790,7 +1794,7 @@ function AdminConsole({
                 const matched = roomTypeInfo.price.match(/\d[\d,]*/);
                 if (matched) pricePerNight = parseInt(matched[0].replace(/,/g, ""), 10);
               }
-              if (!pricePerNight) pricePerNight = 3500;
+              if (!pricePerNight) pricePerNight = getBookingPricePerNight(selectedGuestBooking, rooms);
 
               let nights = 1;
               try {
@@ -3123,7 +3127,7 @@ function RoomsManager({
       property: newRoom.property,
       roomTypeSlug: newRoom.roomTypeSlug,
       advanceAmount: Number(newRoom.advanceAmount) >= 0 ? Number(newRoom.advanceAmount) : 1,
-      pricePerNight: Number(newRoom.pricePerNight) > 0 ? Number(newRoom.pricePerNight) : 3500,
+      pricePerNight: Number(newRoom.pricePerNight) > 0 ? Number(newRoom.pricePerNight) : 6500,
       photos: finalPhotos,
       maxGuests: Number(newRoom.maxGuests) || 4,
       maxAdults: Number(newRoom.maxAdults) || 2,
@@ -3138,7 +3142,7 @@ function RoomsManager({
         property: locations[0]?.key || "",
         roomTypeSlug: ROOMS[0]?.slug || "deluxe-room",
         advanceAmount: 1,
-        pricePerNight: 3500,
+        pricePerNight: 6500,
         maxGuests: 4,
         maxAdults: 2,
         maxKids: 1,

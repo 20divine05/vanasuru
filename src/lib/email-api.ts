@@ -1,4 +1,11 @@
-import { createServerFn } from "@tanstack/react-start";
+import { getBookingPricePerNight } from "./booking-store";
+
+export function getEmailBookingPrice(booking: any): number {
+  if (booking.eventTitle) {
+    return booking.totalAmount || 0;
+  }
+  return getBookingPricePerNight(booking);
+}
 import { z } from "zod";
 
 const guestDetailsSchema = z.object({
@@ -497,7 +504,7 @@ export const sendBillInvoiceEmail = createServerFn({ method: "POST" })
     let nights = 1;
 
     if (isEventBooking) {
-      baseItemTotal = booking.totalAmount || 50000;
+      baseItemTotal = booking.totalAmount || 0;
     } else {
       try {
         if (booking.checkIn && booking.checkOut) {
@@ -511,16 +518,17 @@ export const sendBillInvoiceEmail = createServerFn({ method: "POST" })
       } catch {
         nights = 1;
       }
-      const pricePerNight = booking.pricePerNight || 3500;
+      const pricePerNight = getBookingPricePerNight(booking);
       baseItemTotal = pricePerNight * nights * (booking.roomsCount || 1);
       roomTypeName = formatRoomName(booking.roomTypeSlug || "", booking.roomId);
     }
 
-    const grandTotal =
-      booking.customGrandTotal !== undefined &&
-      booking.customGrandTotal !== null
-        ? booking.customGrandTotal + extraChargesSum
-        : baseItemTotal + extraChargesSum;
+    const baseGrandTotal =
+      booking.customGrandTotal !== undefined && booking.customGrandTotal !== null
+        ? booking.customGrandTotal
+        : Math.max(baseItemTotal, totalPaid);
+
+    const grandTotal = baseGrandTotal + extraChargesSum;
 
     const balanceDue = Math.max(0, grandTotal - totalPaid);
     const invoiceNo = `INV-${String(booking.id)

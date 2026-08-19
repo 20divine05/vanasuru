@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X, Printer, ShieldCheck, CheckCircle2, Clock, Download, Mail, Info } from "lucide-react";
 import { PROPERTIES, ROOMS } from "@/lib/site-data";
-import { useBookingStore, type Booking, type EventBooking } from "@/lib/booking-store";
+import { useBookingStore, getBookingPricePerNight, type Booking, type EventBooking } from "@/lib/booking-store";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { sendBillInvoiceEmail } from "@/lib/email-api";
 
@@ -46,7 +46,9 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
       pricePerNight = parseInt(matched[0].replace(/,/g, ""), 10);
     }
   }
-  if (!pricePerNight) pricePerNight = 3500;
+  if (!pricePerNight && !isEventBooking) {
+    pricePerNight = getBookingPricePerNight(booking as Booking, rooms);
+  }
 
   // Calculate nights
   let totalNights = 1;
@@ -63,18 +65,20 @@ export function BillInvoiceModal({ booking, isOpen, onClose }: BillInvoiceModalP
   }
 
   const baseItemTotal = isEventBooking
-    ? ((booking as EventBooking).totalAmount || 50000)
-    : pricePerNight * totalNights * ((booking as Booking).roomsCount || 1);
+    ? ((booking as EventBooking).totalAmount || 0)
+    : (pricePerNight || 0) * totalNights * ((booking as Booking).roomsCount || 1);
 
   const calculatedBaseGrandTotal = baseItemTotal;
 
   const extraChargesList = booking.extraCharges || [];
   const extraChargesSum = extraChargesList.reduce((sum, c) => sum + c.amount, 0);
 
-  const grandTotal =
+  const baseGrandTotal =
     booking.customGrandTotal !== undefined && booking.customGrandTotal !== null
-      ? booking.customGrandTotal + extraChargesSum
-      : calculatedBaseGrandTotal + extraChargesSum;
+      ? booking.customGrandTotal
+      : Math.max(calculatedBaseGrandTotal, totalPaid);
+
+  const grandTotal = baseGrandTotal + extraChargesSum;
 
   let initialAdvance = isEventBooking
     ? ((booking as EventBooking).advanceAmount || 0)

@@ -59,6 +59,31 @@ export function extractMapEmbedUrl(input: string): string {
   return trimmed;
 }
 
+export function getBookingPricePerNight(b: Booking, rooms?: PhysicalRoom[]): number {
+  if (typeof b.pricePerNight === "number" && b.pricePerNight > 0) {
+    return b.pricePerNight;
+  }
+  if (rooms && rooms.length > 0) {
+    const matchedRoom = rooms.find(
+      (r) =>
+        r.id === b.roomId ||
+        (r.roomTypeSlug === b.roomTypeSlug && isPropertyMatch(r.property, b.property))
+    );
+    if (matchedRoom && typeof matchedRoom.pricePerNight === "number" && matchedRoom.pricePerNight > 0) {
+      return matchedRoom.pricePerNight;
+    }
+  }
+  const siteRoom = ROOMS.find((r) => r.slug === b.roomTypeSlug);
+  if (siteRoom) {
+    const numericStr = siteRoom.price.replace(/[^0-9]/g, "");
+    const parsed = parseInt(numericStr, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
 export interface PhysicalRoom {
   id: string; // e.g. "RM101"
   name: string; // e.g. "101"
@@ -945,8 +970,8 @@ class Store {
           name: room.name,
           property: room.property,
           room_type_slug: room.roomTypeSlug,
-          advance_amount: room.advanceAmount ?? 10,
-          price_per_night: room.pricePerNight ?? 3500,
+          advance_amount: room.advanceAmount ?? 1,
+          price_per_night: room.pricePerNight ?? 0,
           photos: room.photos ?? [],
           max_guests: room.maxGuests ?? 4,
           max_adults: room.maxAdults ?? 2,
@@ -975,7 +1000,7 @@ class Store {
           property: room.property,
           room_type_slug: room.roomTypeSlug,
           advance_amount: room.advanceAmount ?? 1,
-          price_per_night: room.pricePerNight ?? 7000,
+          price_per_night: room.pricePerNight ?? 0,
           photos: room.photos ?? [],
           max_guests: room.maxGuests ?? 4,
           max_adults: room.maxAdults ?? 2,
