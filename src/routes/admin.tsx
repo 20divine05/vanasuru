@@ -352,6 +352,7 @@ function ReportsManagement({
 
   let roomGrossTotal = 0;
   let roomPaidTotal = 0;
+  let roomBalanceDueTotal = 0;
   let roomCheckinCount = 0;
   let roomCompletedCount = 0;
 
@@ -371,11 +372,13 @@ function ReportsManagement({
     }
     const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
     const paid = initialAdv + partials;
+    const due = Math.max(0, grandTotal - paid);
 
     if (b.status !== "cancelled") {
       const effectiveGross = Math.max(grandTotal, paid);
       roomGrossTotal += effectiveGross;
       roomPaidTotal += paid;
+      roomBalanceDueTotal += due;
     }
     if (b.status === "checked_in" || b.status === "checked_out") {
       roomCheckinCount += 1;
@@ -387,6 +390,7 @@ function ReportsManagement({
 
   let eventGrossTotal = 0;
   let eventPaidTotal = 0;
+  let eventBalanceDueTotal = 0;
   let eventCheckinCount = 0;
   let eventCompletedCount = 0;
 
@@ -401,11 +405,13 @@ function ReportsManagement({
     const initialAdv = eb.advanceAmount || 0;
     const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
     const paid = initialAdv + partials;
+    const due = Math.max(0, grandTotal - paid);
 
     if (eb.status !== "cancelled") {
       const effectiveGross = Math.max(grandTotal, paid);
       eventGrossTotal += effectiveGross;
       eventPaidTotal += paid;
+      eventBalanceDueTotal += due;
     }
     if (eb.status === "checked_in" || eb.status === "checked_out") {
       eventCheckinCount += 1;
@@ -417,7 +423,7 @@ function ReportsManagement({
 
   const totalGrossRevenue = roomGrossTotal + eventGrossTotal;
   const totalPaidCollected = roomPaidTotal + eventPaidTotal;
-  const totalBalanceDue = Math.max(0, totalGrossRevenue - totalPaidCollected);
+  const totalBalanceDue = roomBalanceDueTotal + eventBalanceDueTotal;
 
   const totalBookingsCount = filteredRoomBookings.length + filteredEventBookings.length;
   const totalCheckinsCount = roomCheckinCount + eventCheckinCount;
@@ -734,7 +740,7 @@ function ReportsManagement({
             </div>
             <div className="flex justify-between text-charcoal/70">
               <span>Balance Pending:</span>
-              <span className="font-semibold text-amber-800">₹{Math.max(0, roomGrossTotal - roomPaidTotal).toLocaleString("en-IN")}</span>
+              <span className="font-semibold text-amber-800">₹{roomBalanceDueTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
 
@@ -772,7 +778,7 @@ function ReportsManagement({
             </div>
             <div className="flex justify-between text-charcoal/70">
               <span>Balance Pending:</span>
-              <span className="font-semibold text-amber-800">₹{Math.max(0, eventGrossTotal - eventPaidTotal).toLocaleString("en-IN")}</span>
+              <span className="font-semibold text-amber-800">₹{eventBalanceDueTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
 
