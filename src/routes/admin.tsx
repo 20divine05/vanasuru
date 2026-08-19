@@ -358,11 +358,11 @@ function ReportsManagement({
 
   filteredRoomBookings.forEach((b) => {
     const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-    const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
-    const grandTotal =
-      b.customGrandTotal !== undefined && b.customGrandTotal !== null
-        ? b.customGrandTotal + extraChargesSum
-        : calculatedBase + extraChargesSum;
+    const nightsCount =
+      typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
+        ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
+        : b.totalNights || 1;
+    const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
 
     let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
     if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -372,6 +372,13 @@ function ReportsManagement({
     }
     const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
     const paid = initialAdv + partials;
+
+    const baseGrandTotal =
+      b.customGrandTotal !== undefined && b.customGrandTotal !== null
+        ? b.customGrandTotal
+        : Math.max(calculatedBase, paid);
+
+    const grandTotal = baseGrandTotal + extraChargesSum;
     const due = Math.max(0, grandTotal - paid);
 
     if (b.status !== "cancelled") {
@@ -397,14 +404,17 @@ function ReportsManagement({
   filteredEventBookings.forEach((eb) => {
     const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
     const baseTotal = eb.totalAmount || 50000;
-    const grandTotal =
-      eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
-        ? eb.customGrandTotal + extraChargesSum
-        : baseTotal + extraChargesSum;
 
     const initialAdv = eb.advanceAmount || 0;
     const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
     const paid = initialAdv + partials;
+
+    const baseGrandTotal =
+      eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
+        ? eb.customGrandTotal
+        : Math.max(baseTotal, paid);
+
+    const grandTotal = baseGrandTotal + extraChargesSum;
     const due = Math.max(0, grandTotal - paid);
 
     if (eb.status !== "cancelled") {
@@ -451,11 +461,11 @@ function ReportsManagement({
 
     filteredRoomBookings.forEach((b) => {
       const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-      const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
-      const grandTotal =
-        b.customGrandTotal !== undefined && b.customGrandTotal !== null
-          ? b.customGrandTotal + extraChargesSum
-          : calculatedBase + extraChargesSum;
+      const nightsCount =
+        typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
+          ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
+          : b.totalNights || 1;
+      const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
 
       let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
       if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -465,6 +475,13 @@ function ReportsManagement({
       }
       const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
       const paid = initialAdv + partials;
+
+      const baseGrandTotal =
+        b.customGrandTotal !== undefined && b.customGrandTotal !== null
+          ? b.customGrandTotal
+          : Math.max(calculatedBase, paid);
+
+      const grandTotal = baseGrandTotal + extraChargesSum;
       const due = Math.max(0, grandTotal - paid);
 
       dataRows.push([
@@ -824,11 +841,11 @@ function ReportsManagement({
             <tbody className="divide-y divide-border/40">
               {filteredRoomBookings.map((b) => {
                 const extraChargesSum = (b.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
-                const calculatedBase = (b.pricePerNight || 3500) * (b.totalNights || 1) * (b.roomsCount || 1);
-                const grandTotal =
-                  b.customGrandTotal !== undefined && b.customGrandTotal !== null
-                    ? b.customGrandTotal + extraChargesSum
-                    : calculatedBase + extraChargesSum;
+                const nightsCount =
+                  typeof b.checkIn === "string" && typeof b.checkOut === "string" && b.checkIn && b.checkOut
+                    ? Math.max(1, differenceInDays(parseISO(b.checkOut), parseISO(b.checkIn)))
+                    : b.totalNights || 1;
+                const calculatedBase = (b.pricePerNight || 3500) * nightsCount * (b.roomsCount || 1);
 
                 let initialAdv = typeof b.payment?.amountPaid === "number" ? b.payment.amountPaid : 0;
                 if (b.payment?.provider === "razorpay" && initialAdv >= 100) {
@@ -838,6 +855,13 @@ function ReportsManagement({
                 }
                 const partials = (b.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
                 const paid = initialAdv + partials;
+
+                const baseGrandTotal =
+                  b.customGrandTotal !== undefined && b.customGrandTotal !== null
+                    ? b.customGrandTotal
+                    : Math.max(calculatedBase, paid);
+
+                const grandTotal = baseGrandTotal + extraChargesSum;
                 const due = Math.max(0, grandTotal - paid);
 
                 return (
@@ -889,14 +913,16 @@ function ReportsManagement({
               {filteredEventBookings.map((eb) => {
                 const extraChargesSum = (eb.extraCharges || []).reduce((acc, c) => acc + c.amount, 0);
                 const baseTotal = eb.totalAmount || 50000;
-                const grandTotal =
-                  eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
-                    ? eb.customGrandTotal + extraChargesSum
-                    : baseTotal + extraChargesSum;
-
                 const initialAdv = eb.advanceAmount || 0;
                 const partials = (eb.paymentsHistory || []).reduce((acc, p) => acc + p.amount, 0);
                 const paid = initialAdv + partials;
+
+                const baseGrandTotal =
+                  eb.customGrandTotal !== undefined && eb.customGrandTotal !== null
+                    ? eb.customGrandTotal
+                    : Math.max(baseTotal, paid);
+
+                const grandTotal = baseGrandTotal + extraChargesSum;
                 const due = Math.max(0, grandTotal - paid);
 
                 return (
