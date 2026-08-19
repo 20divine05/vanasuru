@@ -105,6 +105,7 @@ function DashboardPage() {
     addGalleryItem,
     deleteGalleryItem,
     addEvent,
+    updateEvent,
     deleteEvent,
     toggleHighlightEvent,
     createEventBooking,
@@ -167,6 +168,7 @@ function DashboardPage() {
           addGalleryItem={addGalleryItem}
           deleteGalleryItem={deleteGalleryItem}
           addEvent={addEvent}
+          updateEvent={updateEvent}
           deleteEvent={deleteEvent}
           toggleHighlightEvent={toggleHighlightEvent}
           createEventBooking={createEventBooking}
@@ -970,6 +972,7 @@ function AdminConsole({
   addGalleryItem: addGalleryItemFn,
   deleteGalleryItem: deleteGalleryItemFn,
   addEvent: addEventFn,
+  updateEvent: updateEventFn,
   deleteEvent: deleteEventFn,
   toggleHighlightEvent: toggleHighlightEventFn,
   createEventBooking: createEventBookingFn,
@@ -1009,6 +1012,7 @@ function AdminConsole({
   addGalleryItem: (item: Omit<GalleryItem, "id">) => GalleryItem;
   deleteGalleryItem: (id: string) => boolean;
   addEvent: (eventData: Omit<ResortEvent, "id" | "createdAt">) => ResortEvent;
+  updateEvent: (eventData: ResortEvent) => boolean;
   deleteEvent: (id: string) => boolean;
   toggleHighlightEvent: (id: string) => boolean;
   createEventBooking: (data: Omit<EventBooking, "id" | "createdAt" | "status"> & { paymentMode?: PaymentEntry["mode"] }) => { success: boolean; booking?: EventBooking; error?: string };
@@ -1058,7 +1062,7 @@ function AdminConsole({
 }) {
   const [selectedProperty, setSelectedProperty] = useState(locations[0]?.key || "mysore");
   const [activeTab, setActiveTab] = useState<
-    "reports" | "bookings" | "timeline" | "rooms" | "locations" | "gallery" | "events"
+    "reports" | "bookings" | "timeline" | "rooms" | "locations" | "gallery" | "events" | "salary"
   >("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BookingStatusFilter>("all");
@@ -1287,6 +1291,7 @@ function AdminConsole({
     { key: "locations", label: "Locations", icon: <MapPin size={14} /> },
     { key: "gallery", label: "Gallery", icon: <Image size={14} /> },
     { key: "events", label: "Events & Halls", icon: <Sparkles size={14} /> },
+    { key: "salary", label: "Salary Slip", icon: <FileText size={14} /> },
   ];
 
   return (
@@ -2476,6 +2481,7 @@ function AdminConsole({
           eventBookings={eventBookings}
           locations={locations}
           addEvent={addEventFn}
+          updateEvent={updateEventFn}
           deleteEvent={deleteEventFn}
           toggleHighlightEvent={toggleHighlightEventFn}
           createEventBooking={createEventBookingFn}
@@ -2488,6 +2494,32 @@ function AdminConsole({
           deleteEventBooking={deleteEventBookingFn}
           onViewBill={(eb) => setInvoiceBooking(eb)}
         />
+      )}
+
+      {activeTab === "salary" && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-card border border-border/60 p-6 shadow-sm">
+            <div>
+              <h3 className="font-serif text-2xl text-[color:var(--forest)] font-bold flex items-center gap-2">
+                <FileText size={22} className="text-[color:var(--gold)]" /> Employee Monthly Salary Slip Generator
+              </h3>
+              <p className="text-xs text-charcoal/60 mt-1">
+                Generate, edit, and print official employee salary slips for MA SHRI VENTURES PRIVATE LIMITED.
+              </p>
+            </div>
+            <Link
+              to="/salary-slip"
+              className="bg-[color:var(--forest)] text-ivory hover:bg-[color:var(--gold)] hover:text-black font-semibold text-xs uppercase px-5 py-2.5 tracking-wider transition-colors"
+            >
+              Open Fullscreen Generator ↗
+            </Link>
+          </div>
+          <iframe
+            src="/salary-slip"
+            title="Salary Slip Generator"
+            className="w-full min-h-[900px] border border-border/60 rounded bg-background shadow-inner"
+          />
+        </div>
       )}
 
       <BillInvoiceModal
@@ -4248,6 +4280,7 @@ function EventsManager({
   eventBookings,
   locations,
   addEvent,
+  updateEvent,
   deleteEvent,
   toggleHighlightEvent,
   createEventBooking,
@@ -4264,6 +4297,7 @@ function EventsManager({
   eventBookings: EventBooking[];
   locations: Location[];
   addEvent: (eventData: Omit<ResortEvent, "id" | "createdAt">) => ResortEvent;
+  updateEvent: (eventData: ResortEvent) => boolean;
   deleteEvent: (id: string) => boolean;
   toggleHighlightEvent: (id: string) => boolean;
   createEventBooking: (data: Omit<EventBooking, "id" | "createdAt" | "status"> & { paymentMode?: PaymentEntry["mode"] }) => { success: boolean; booking?: EventBooking; error?: string };
@@ -4277,6 +4311,35 @@ function EventsManager({
   onViewBill: (eb: EventBooking) => void;
 }) {
   const [filterProp, setFilterProp] = useState<string>("all");
+
+  const [editingEvent, setEditingEvent] = useState<ResortEvent | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    property: "",
+    venue: "",
+    date: "",
+    capacity: "100",
+    price: "0",
+    description: "",
+    image: "",
+    isHighlighted: false,
+  });
+
+  useEffect(() => {
+    if (editingEvent) {
+      setEditForm({
+        title: editingEvent.title || "",
+        property: editingEvent.property || locations[0]?.key || "mysore",
+        venue: editingEvent.venue || "",
+        date: editingEvent.date || "Available Daily",
+        capacity: (editingEvent.capacity || 100).toString(),
+        price: (editingEvent.price || 0).toString(),
+        description: editingEvent.description || "",
+        image: editingEvent.image || "",
+        isHighlighted: editingEvent.isHighlighted || false,
+      });
+    }
+  }, [editingEvent, locations]);
 
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualSuccess, setManualSuccess] = useState("");
@@ -4474,6 +4537,12 @@ function EventsManager({
             className="inline-flex items-center gap-2 bg-[color:var(--forest)] text-ivory px-6 py-3 text-xs font-semibold tracking-widest uppercase hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] transition-colors"
           >
             <Plus size={16} /> Create Event / Function Hall
+          </Link>
+          <Link
+            to="/salary-slip"
+            className="inline-flex items-center gap-2 bg-[color:var(--gold)] text-[color:var(--forest-deep)] px-6 py-3 text-xs font-bold tracking-widest uppercase hover:bg-amber-400 transition-colors shadow-sm"
+          >
+            <FileText size={16} /> Salary Slip
           </Link>
         </div>
       </div>
@@ -5232,39 +5301,233 @@ function EventsManager({
                   {evt.title}
                 </h5>
                 <p className="text-xs text-charcoal/70 mt-2 line-clamp-2">{evt.description}</p>
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-charcoal/60 border-t border-border/40 pt-3">
+                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-charcoal/60 border-t border-border/40 pt-3 font-medium">
                   <div>📅 {evt.date}</div>
                   <div>👥 Cap: {evt.capacity}</div>
-                  <div>₹{evt.price.toLocaleString("en-IN")}</div>
+                  <div className="font-bold text-emerald-800 font-mono">
+                    ₹{(Number(evt.price) || 0).toLocaleString("en-IN")}
+                  </div>
                 </div>
               </div>
-              <div className="mt-5 border-t border-border/40 pt-3 flex items-center justify-between">
+              <div className="mt-5 border-t border-border/40 pt-3 flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => toggleHighlightEvent(evt.id)}
-                  className={`text-[10px] font-semibold tracking-wider uppercase px-3 py-1.5 border transition-colors ${
+                  className={`text-[10px] font-semibold tracking-wider uppercase px-2.5 py-1.5 border transition-colors ${
                     evt.isHighlighted
-                      ? "bg-[color:var(--gold)]/20 border-[color:var(--gold)] text-[color:var(--forest)]"
+                      ? "bg-[color:var(--gold)]/20 border-[color:var(--gold)] text-[color:var(--forest)] font-bold"
                       : "border-border text-charcoal/60 hover:border-[color:var(--gold)]"
                   }`}
                 >
                   {evt.isHighlighted ? "★ Highlighted" : "☆ Highlight"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm(`Delete event "${evt.title}"?`)) {
-                      deleteEvent(evt.id);
-                    }
-                  }}
-                  className="p-1.5 border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 rounded-sm"
-                  title="Delete Event"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEvent(evt)}
+                    className="px-2.5 py-1.5 border border-border text-charcoal bg-sand/30 hover:bg-sand/60 hover:border-[color:var(--gold)] rounded-sm flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                    title="Edit Event & Venue Details"
+                  >
+                    <Pencil size={12} className="text-[color:var(--forest)]" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Delete event "${evt.title}"?`)) {
+                        deleteEvent(evt.id);
+                      }
+                    }}
+                    className="p-1.5 border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 rounded-sm cursor-pointer"
+                    title="Delete Event"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+
+          {/* EDIT EVENT MODAL */}
+          {editingEvent && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
+              <div className="bg-card border border-[color:var(--gold)]/40 shadow-2xl max-w-xl w-full p-6 space-y-4 relative animate-in fade-in zoom-in duration-200 my-8">
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <h3 className="font-serif text-xl font-bold text-[color:var(--forest)] flex items-center gap-2">
+                    <Pencil size={18} className="text-[color:var(--gold)]" /> Edit Event &amp; Function Hall Details
+                  </h3>
+                  <button
+                    onClick={() => setEditingEvent(null)}
+                    className="text-charcoal/50 hover:text-charcoal cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!editingEvent) return;
+                    updateEvent({
+                      ...editingEvent,
+                      title: editForm.title.trim(),
+                      property: editForm.property,
+                      venue: editForm.venue.trim(),
+                      date: editForm.date.trim() || "Available Daily",
+                      capacity: parseInt(editForm.capacity, 10) || 100,
+                      price: parseFloat(editForm.price) || 0,
+                      description: editForm.description.trim(),
+                      image: editForm.image.trim(),
+                      isHighlighted: editForm.isHighlighted,
+                    });
+                    setEditingEvent(null);
+                  }}
+                  className="space-y-4 text-xs"
+                >
+                  <div>
+                    <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                      Event Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)] font-medium"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                        Resort Location *
+                      </label>
+                      <select
+                        value={editForm.property}
+                        onChange={(e) => setEditForm({ ...editForm, property: e.target.value })}
+                        className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)]"
+                      >
+                        {locations.map((loc) => (
+                          <option key={loc.key} value={loc.key}>
+                            {loc.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                        Venue / Hall Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editForm.venue}
+                        onChange={(e) => setEditForm({ ...editForm, venue: e.target.value })}
+                        className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                        Event Date
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.date}
+                        onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                        placeholder="Available Daily"
+                        className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                        Guest Capacity *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={editForm.capacity}
+                        onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })}
+                        className="w-full bg-transparent border border-border px-3 py-2 text-xs font-mono focus:outline-none focus:border-[color:var(--gold)]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                        Price (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={editForm.price}
+                        onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                        className="w-full bg-transparent border border-border px-3 py-2 text-xs font-mono font-bold text-emerald-800 focus:outline-none focus:border-[color:var(--gold)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                      Cover Photo Image URL
+                    </label>
+                    <input
+                      type="url"
+                      value={editForm.image}
+                      onChange={(e) => setEditForm({ ...editForm, image: e.target.value })}
+                      placeholder="https://..."
+                      className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block uppercase font-bold text-[10px] text-charcoal/60 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="w-full bg-transparent border border-border px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--gold)]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded">
+                    <input
+                      type="checkbox"
+                      id="editHighlightCheck"
+                      checked={editForm.isHighlighted}
+                      onChange={(e) => setEditForm({ ...editForm, isHighlighted: e.target.checked })}
+                      className="w-4 h-4 accent-[color:var(--gold)] cursor-pointer"
+                    />
+                    <label htmlFor="editHighlightCheck" className="text-xs font-semibold text-amber-900 cursor-pointer">
+                      Highlight event on Home page showcase
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-3 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setEditingEvent(null)}
+                      className="px-4 py-2 border border-border text-charcoal text-xs font-semibold uppercase tracking-wider hover:bg-sand/30"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-[color:var(--forest)] text-ivory text-xs font-semibold uppercase tracking-wider hover:bg-[color:var(--gold)] hover:text-black transition-colors"
+                    >
+                      Save Event Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
           {filteredEvents.length === 0 && (
             <div className="col-span-full py-12 text-center text-sm text-charcoal/50 border border-dashed border-border">
               No events configured. Click "Create Event" to publish one.

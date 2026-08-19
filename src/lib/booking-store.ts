@@ -709,6 +709,8 @@ class Store {
   addEvent(eventData: Omit<ResortEvent, "id" | "createdAt">): ResortEvent {
     const newEvent: ResortEvent = {
       ...eventData,
+      capacity: Math.max(1, Number(eventData.capacity) || 100),
+      price: Math.max(0, Number(eventData.price) || 0),
       id: "evt-" + Math.random().toString(36).substring(2, 9),
       createdAt: new Date().toISOString(),
     };
@@ -717,6 +719,23 @@ class Store {
     this.notify();
     void syncEventDb({ data: { event: newEvent } }).catch(() => {});
     return newEvent;
+  }
+
+  updateEvent(eventData: ResortEvent): boolean {
+    const idx = this.events.findIndex((e) => e.id === eventData.id);
+    if (idx >= 0) {
+      const cleanEvent: ResortEvent = {
+        ...eventData,
+        capacity: Math.max(1, Number(eventData.capacity) || 100),
+        price: Math.max(0, Number(eventData.price) || 0),
+      };
+      this.events[idx] = cleanEvent;
+      this.save();
+      this.notify();
+      void syncEventDb({ data: { event: cleanEvent } }).catch(() => {});
+      return true;
+    }
+    return false;
   }
 
   deleteEvent(id: string): boolean {
@@ -1573,6 +1592,7 @@ export function useBookingStore() {
     deleteGalleryItem: (id: string) => bookingStore.deleteGalleryItem(id),
     addEvent: (eventData: Omit<ResortEvent, "id" | "createdAt">) =>
       bookingStore.addEvent(eventData),
+    updateEvent: (eventData: ResortEvent) => bookingStore.updateEvent(eventData),
     deleteEvent: (id: string) => bookingStore.deleteEvent(id),
     toggleHighlightEvent: (id: string) => bookingStore.toggleHighlightEvent(id),
     createEventBooking: (data: Omit<EventBooking, "id" | "createdAt" | "status">) =>
