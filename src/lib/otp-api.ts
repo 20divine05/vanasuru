@@ -38,11 +38,12 @@ export const sendRegistrationOtp = createServerFn({ method: "POST" })
 
     pendingOtps.set(formattedEmail, { otp, expiresAt });
 
-    const smtpHost = process.env.SMTP_HOST ?? (import.meta as any).env?.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT ?? (import.meta as any).env?.SMTP_PORT;
-    const smtpUser = process.env.SMTP_USER ?? (import.meta as any).env?.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS ?? (import.meta as any).env?.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM ?? (import.meta as any).env?.SMTP_FROM ?? "no-reply@vanasuru.com";
+    const smtpHost = process.env.SMTP_HOST ?? (import.meta as any).env?.SMTP_HOST ?? "smtp.gmail.com";
+    const smtpPort = process.env.SMTP_PORT ?? (import.meta as any).env?.SMTP_PORT ?? "465";
+    const smtpUser = process.env.SMTP_USER ?? (import.meta as any).env?.SMTP_USER ?? "vanasuru05@gmail.com";
+    const rawPass = process.env.SMTP_PASS ?? (import.meta as any).env?.SMTP_PASS ?? "glnccveazyaqaixx";
+    const smtpPass = rawPass.replace(/\s+/g, "");
+    const smtpFrom = process.env.SMTP_FROM ?? (import.meta as any).env?.SMTP_FROM ?? '"VANASURU Retreats" <vanasuru05@gmail.com>';
 
     // Check if SMTP is configured
     if (smtpHost && smtpPort && smtpUser && smtpPass) {
@@ -51,7 +52,7 @@ export const sendRegistrationOtp = createServerFn({ method: "POST" })
         const transporter = nodemailer.createTransport({
           host: smtpHost,
           port: parseInt(smtpPort, 10),
-          secure: parseInt(smtpPort, 10) === 465, // True for 465, false for other ports
+          secure: parseInt(smtpPort, 10) === 465, // True for 465
           auth: {
             user: smtpUser,
             pass: smtpPass,

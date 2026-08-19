@@ -74,23 +74,19 @@ function formatRoomName(slug: string, roomId?: string): string {
 }
 
 function getSmtpTransporter() {
-  const smtpHost = process.env.SMTP_HOST ?? (import.meta as any).env?.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT ?? (import.meta as any).env?.SMTP_PORT;
-  const smtpUser = process.env.SMTP_USER ?? (import.meta as any).env?.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS ?? (import.meta as any).env?.SMTP_PASS;
+  const smtpHost = process.env.SMTP_HOST ?? (import.meta as any).env?.SMTP_HOST ?? "smtp.gmail.com";
+  const smtpPort = process.env.SMTP_PORT ?? (import.meta as any).env?.SMTP_PORT ?? "465";
+  const smtpUser = process.env.SMTP_USER ?? (import.meta as any).env?.SMTP_USER ?? "vanasuru05@gmail.com";
+  const rawPass = process.env.SMTP_PASS ?? (import.meta as any).env?.SMTP_PASS ?? "glnccveazyaqaixx";
+  const smtpPass = rawPass.replace(/\s+/g, "");
   const smtpFrom =
     process.env.SMTP_FROM ??
     (import.meta as any).env?.SMTP_FROM ??
-    "bskoushik30@gmail.com";
+    '"VANASURU Retreats" <vanasuru05@gmail.com>';
   const adminEmail =
     process.env.ADMIN_EMAIL ??
     (import.meta as any).env?.ADMIN_EMAIL ??
-    "vanasurumys@gmail.com";
-
-  if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-    console.warn("[SMTP] Email settings missing from process.env / .env");
-    return null;
-  }
+    "vanasuru05@gmail.com";
 
   return {
     host: smtpHost,
