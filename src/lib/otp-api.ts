@@ -38,12 +38,12 @@ export const sendRegistrationOtp = createServerFn({ method: "POST" })
 
     pendingOtps.set(formattedEmail, { otp, expiresAt });
 
-    const smtpHost = process.env.SMTP_HOST ?? (import.meta as any).env?.SMTP_HOST ?? "smtp.gmail.com";
-    const smtpPort = process.env.SMTP_PORT ?? (import.meta as any).env?.SMTP_PORT ?? "465";
-    const smtpUser = process.env.SMTP_USER ?? (import.meta as any).env?.SMTP_USER ?? "vanasuru05@gmail.com";
-    const rawPass = process.env.SMTP_PASS ?? (import.meta as any).env?.SMTP_PASS ?? "glnccveazyaqaixx";
-    const smtpPass = rawPass.replace(/\s+/g, "");
-    const smtpFrom = process.env.SMTP_FROM ?? (import.meta as any).env?.SMTP_FROM ?? '"VANASURU Retreats" <vanasuru05@gmail.com>';
+    const smtpHost = (process.env.SMTP_HOST || (import.meta as any).env?.SMTP_HOST || "smtp.gmail.com").trim() || "smtp.gmail.com";
+    const smtpPort = (process.env.SMTP_PORT || (import.meta as any).env?.SMTP_PORT || "465").trim() || "465";
+    const smtpUser = (process.env.SMTP_USER || (import.meta as any).env?.SMTP_USER || "vanasuru05@gmail.com").trim() || "vanasuru05@gmail.com";
+    const rawPass = process.env.SMTP_PASS || (import.meta as any).env?.SMTP_PASS || "glnccveazyaqaixx";
+    const smtpPass = rawPass.replace(/\s+/g, "") || "glnccveazyaqaixx";
+    const smtpFrom = (process.env.SMTP_FROM || (import.meta as any).env?.SMTP_FROM || '"VANASURU Retreats" <vanasuru05@gmail.com>').trim();
 
     // Check if SMTP is configured
     if (smtpHost && smtpPort && smtpUser && smtpPass) {
