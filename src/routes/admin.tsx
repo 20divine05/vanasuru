@@ -373,7 +373,8 @@ function ReportsManagement({
     const paid = initialAdv + partials;
 
     if (b.status !== "cancelled") {
-      roomGrossTotal += grandTotal;
+      const effectiveGross = Math.max(grandTotal, paid);
+      roomGrossTotal += effectiveGross;
       roomPaidTotal += paid;
     }
     if (b.status === "checked_in" || b.status === "checked_out") {
@@ -402,7 +403,8 @@ function ReportsManagement({
     const paid = initialAdv + partials;
 
     if (eb.status !== "cancelled") {
-      eventGrossTotal += grandTotal;
+      const effectiveGross = Math.max(grandTotal, paid);
+      eventGrossTotal += effectiveGross;
       eventPaidTotal += paid;
     }
     if (eb.status === "checked_in" || eb.status === "checked_out") {
