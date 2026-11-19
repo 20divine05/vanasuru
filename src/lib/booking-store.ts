@@ -206,7 +206,7 @@ export interface Booking {
   checkedOutAt?: string;
   emailNotified?: boolean;
   payment?: {
-    provider: "razorpay";
+    provider: string;
     orderId: string;
     paymentId: string;
     amountPaid: number;

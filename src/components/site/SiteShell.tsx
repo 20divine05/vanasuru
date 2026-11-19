@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { SiteHeader } from "./Header";
 import { SiteFooter } from "./Footer";
+import { WhatsAppFab } from "./WhatsAppFab";
+
 export function SiteShell({
   children,
   transparentHeader = true,
@@ -13,6 +15,7 @@ export function SiteShell({
       <SiteHeader transparentOnTop={transparentHeader} />
       <main>{children}</main>
       <SiteFooter />
+      <WhatsAppFab />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { PageHero } from "@/components/site/PageHero";
 import { SectionHeading } from "@/components/site/SectionHeading";
-import { PROPERTIES, EVENT_TYPES, FUNCTION_HALLS } from "@/lib/site-data";
+import { BRAND, PROPERTIES, EVENT_TYPES, FUNCTION_HALLS } from "@/lib/site-data";
 import { useBookingStore, extractMapEmbedUrl, type ResortEvent } from "@/lib/booking-store";
 import {
   CheckCircle2,
@@ -17,6 +17,7 @@ import {
   X,
   Star,
   Check,
+  MessageCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/events")({
@@ -213,16 +214,28 @@ function EventsPage() {
                   </div>
                 </div>
 
-                <div className="p-6 pt-0 border-t border-border/40 mt-4 flex items-center justify-between">
-                  <div className="font-serif text-lg font-bold text-[color:var(--forest)]">
-                    ₹{evt.price.toLocaleString("en-IN")}
+                <div className="p-6 pt-0 border-t border-border/40 mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+                    Pricing on Request
                   </div>
-                  <Link
-                    to="/contact"
-                    className="inline-flex items-center gap-2 bg-[color:var(--forest)] text-ivory px-4 py-2.5 text-[10px] font-semibold tracking-widest uppercase hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] transition-colors cursor-pointer"
-                  >
-                    Inquire &amp; Contact <ArrowRight size={12} />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://wa.me/${BRAND.phoneWhatsapp}?text=${encodeURIComponent(
+                        `Hello VANASURU Retreats, I would like to inquire about event packages for "${evt.title}" (${activeLocation.name}).`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white px-3.5 py-2 text-[10px] font-bold tracking-wider uppercase transition-colors rounded shadow-sm"
+                    >
+                      <MessageCircle size={13} /> WhatsApp
+                    </a>
+                    <Link
+                      to="/contact"
+                      className="inline-flex items-center gap-1.5 bg-[color:var(--forest)] text-ivory px-3.5 py-2 text-[10px] font-semibold tracking-wider uppercase hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] transition-colors cursor-pointer rounded shadow-sm"
+                    >
+                      Inquire <ArrowRight size={11} />
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}

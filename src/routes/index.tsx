@@ -219,8 +219,8 @@ function Index() {
                           <Calendar size={13} className="text-[color:var(--gold)]" />
                           {evt.date}
                         </span>
-                        <span className="font-semibold text-[color:var(--forest)] font-mono">
-                          ₹{evt.price.toLocaleString("en-IN")}
+                        <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                          Rates on Request
                         </span>
                       </div>
                     </div>

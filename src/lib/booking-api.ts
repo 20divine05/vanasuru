@@ -542,6 +542,52 @@ export const verifyAdvancePayment = createServerFn({ method: "POST" })
     return { booking };
   });
 
+const directReservationInputSchema = z.object({
+  booking: bookingInputSchema,
+  user: userSchema,
+  channel: z.enum(["whatsapp", "email", "direct"]).optional().default("whatsapp"),
+});
+
+export const createDirectReservation = createServerFn({ method: "POST" })
+  .validator(directReservationInputSchema)
+  .handler(async ({ data }) => {
+    const assignedRoomId = await resolveRoom(data.booking);
+    if (!assignedRoomId) {
+      throw new Error("Selected room type is no longer available for these dates.");
+    }
+
+    const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const channelMode = data.channel || "whatsapp";
+    const paymentId = channelMode === "email" ? "EMAIL_RESERVATION" : "WHATSAPP_RESERVATION";
+
+    const booking: Booking = {
+      ...data.booking,
+      id: bookingId,
+      userEmail: data.user.email,
+      userName: data.user.name,
+      roomId: assignedRoomId,
+      status: bookingStatusSchema.parse("confirmed"),
+      createdAt: new Date().toISOString(),
+      payment: {
+        provider: "offline",
+        orderId: `DIRECT_${channelMode.toUpperCase()}`,
+        paymentId,
+        amountPaid: 0,
+        currency: PAYMENT_CURRENCY,
+        paidAt: new Date().toISOString(),
+      },
+    };
+
+    await persistBooking(booking);
+
+    // Send confirmation emails to guest and admin
+    void sendBookingConfirmationEmail({ data: { booking } }).catch((err) => {
+      console.warn("Failed to send direct booking confirmation email:", err);
+    });
+
+    return { booking };
+  });
+
 // Unified initial store loader
 export const getInitialStoreData = createServerFn({ method: "POST" }).handler(async () => {
   const [

@@ -1987,7 +1987,7 @@ function AdminConsole({
                         <option value="UPI">UPI Payment</option>
                         <option value="Card">Credit/Debit Card</option>
                         <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="Razorpay">Razorpay Online</option>
+                        <option value="Razorpay">Direct Online Transfer</option>
                         <option value="Other">Other</option>
                       </select>
                       <input
@@ -5122,7 +5122,7 @@ function EventsManager({
                         <option value="UPI">UPI Payment</option>
                         <option value="Card">Credit/Debit Card</option>
                         <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="Razorpay">Razorpay Online</option>
+                        <option value="Razorpay">Direct Online Transfer</option>
                         <option value="Other">Other</option>
                       </select>
                       <input

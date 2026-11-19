@@ -12,16 +12,15 @@ import {
   User,
   FileText,
   IdCard,
+  MessageCircle,
 } from "lucide-react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { BillInvoiceModal } from "@/components/site/BillInvoiceModal";
-import { PROPERTIES, ROOMS, type PropertyKey } from "@/lib/site-data";
+import { BRAND, PROPERTIES, ROOMS, type PropertyKey } from "@/lib/site-data";
 import { useBookingStore, type CreateBookingInput } from "@/lib/booking-store";
 import {
-  ADVANCE_AMOUNT_RUPEES,
-  createAdvancePaymentOrder,
+  createDirectReservation,
   getBookingAvailability,
-  verifyAdvancePayment,
 } from "@/lib/booking-api";
 
 function isPropertyKey(value: unknown): value is PropertyKey {
@@ -44,34 +43,6 @@ type Availability = {
   availableRoomIds: string[];
 };
 
-type RazorpayPaymentResponse = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayCheckoutOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  prefill: { name: string; email: string; contact: string };
-  notes: Record<string, string>;
-  theme: { color: string };
-  handler: (response: RazorpayPaymentResponse) => void;
-  modal: { ondismiss: () => void };
-};
-
-type RazorpayConstructor = new (options: RazorpayCheckoutOptions) => { open: () => void };
-
-declare global {
-  interface Window {
-    Razorpay?: RazorpayConstructor;
-  }
-}
-
 export const Route = createFileRoute("/book")({
   validateSearch: (s: Record<string, unknown>): Search => ({
     property: isPropertyKey(s.property) ? s.property : undefined,
@@ -84,13 +55,13 @@ export const Route = createFileRoute("/book")({
   }),
   head: () => ({
     meta: [
-      { title: "Book Your Stay - VANASURU" },
+      { title: "Book Your Stay — VANASURU" },
       {
         name: "description",
-        content: "Check room availability and pay the VANASURU booking advance.",
+        content: "Check room availability and reserve your stay at VANASURU via WhatsApp or Email.",
       },
-      { property: "og:title", content: "Book Your Stay - VANASURU" },
-      { property: "og:description", content: "Check availability and secure your stay." },
+      { property: "og:title", content: "Book Your Stay — VANASURU" },
+      { property: "og:description", content: "Check availability and reserve your stay." },
     ],
   }),
   component: BookPage,
@@ -127,8 +98,7 @@ function BookPage() {
   const search = Route.useSearch();
   const { currentUser, login, register, recordVerifiedBooking, rooms, bookings } = useBookingStore();
   const fetchAvailability = useServerFn(getBookingAvailability);
-  const createPaymentOrder = useServerFn(createAdvancePaymentOrder);
-  const verifyPayment = useServerFn(verifyAdvancePayment);
+  const createReservation = useServerFn(createDirectReservation);
 
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -136,9 +106,8 @@ function BookPage() {
   const [showBillModal, setShowBillModal] = useState(false);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
-  const [paidAdvanceDisplay, setPaidAdvanceDisplay] = useState("");
 
   const defaultDates = useMemo(() => {
     const tomorrow = new Date();
@@ -189,20 +158,7 @@ function BookPage() {
     }
   };
 
-  const selectedRoomAdvanceRupees = useMemo(() => {
-    if (form.roomId) {
-      const r = rooms.find((rm) => rm.id === form.roomId);
-      if (r?.advanceAmount != null) return r.advanceAmount;
-    }
-    const matching = rooms.find(
-      (rm) => rm.property === form.property && rm.roomTypeSlug === form.roomType,
-    );
-    if (matching?.advanceAmount != null) return matching.advanceAmount;
-    return 10;
-  }, [form.roomId, form.property, form.roomType, rooms]);
 
-  const advanceDisplayStr =
-    paidAdvanceDisplay || `Rs. ${selectedRoomAdvanceRupees.toLocaleString("en-IN")}`;
 
   const [isRegisterTab, setIsRegisterTab] = useState(false);
   const [authName, setAuthName] = useState("");
@@ -346,66 +302,145 @@ function BookPage() {
       return;
     }
     if (!currentUser) {
-      setBookingError("Please sign in before paying the advance.");
+      setBookingError("Please sign in or enter your details before confirming your reservation.");
       setStep(1);
       return;
     }
 
-    setIsProcessingPayment(true);
+    await handleCompleteBooking("whatsapp");
+  };
+
+  const handleCompleteBooking = async (channel: "whatsapp" | "email") => {
+    setBookingError("");
+
+    if (!currentUser) {
+      setBookingError("Please sign in or enter your details before confirming your reservation.");
+      setStep(1);
+      return;
+    }
+
+    if (!form.terms) {
+      setBookingError("Please accept the booking terms to proceed.");
+      return;
+    }
+
+    setIsSubmittingBooking(true);
     try {
-      await loadRazorpayCheckout();
-      const booking = buildBookingInput();
-      const order = await createPaymentOrder({ data: { booking, user: currentUser } });
-      if (order.amountDisplay) {
-        setPaidAdvanceDisplay(order.amountDisplay);
-      }
-      const paymentResponse = await openRazorpayCheckout({
-        keyId: order.keyId,
-        orderId: order.orderId,
-        amount: order.amount,
-        currency: order.currency,
-        booking,
-        guestName: currentUser.name,
+      const bookingInput = buildBookingInput();
+      const result = await createReservation({
+        data: {
+          booking: bookingInput,
+          user: currentUser,
+          channel,
+        },
       });
-      const result = await verifyPayment({ data: paymentResponse });
+
       recordVerifiedBooking(result.booking);
       setBookingId(result.booking.id);
+
+      const propInfo = PROPERTIES[form.property] || PROPERTIES["mysore"];
+      const roomInfo = ROOMS.find((r) => r.slug === form.roomType);
+      const roomName = roomInfo?.name || form.roomType;
+
+      const messageText =
+        `Hello VANASURU Retreats,\n\n` +
+        `I would like to confirm my booking with the following details:\n` +
+        `• Booking ID: ${result.booking.id}\n` +
+        `• Property: ${propInfo.name}\n` +
+        `• Room: ${roomName}\n` +
+        `• Check-In: ${form.checkIn}\n` +
+        `• Check-Out: ${form.checkOut}\n` +
+        `• Guests: ${form.adults} Adult(s)${form.children > 0 ? `, ${form.children} Child(ren)` : ""}\n` +
+        `• Guest Name: ${form.firstName} ${form.lastName}\n` +
+        `• Mobile: ${form.mobile}\n` +
+        `• Email: ${form.email}\n` +
+        (form.requests ? `• Special Requests: ${form.requests}\n` : "") +
+        `\nPlease confirm our reservation. Thank you!`;
+
+      if (channel === "whatsapp") {
+        const waUrl = `https://wa.me/${BRAND.phoneWhatsapp}?text=${encodeURIComponent(messageText)}`;
+        window.open(waUrl, "_blank");
+      } else {
+        const mailtoUrl = `mailto:vanasurumys@gmail.com?subject=${encodeURIComponent(
+          `Reservation Request - ${result.booking.id} - ${form.firstName} ${form.lastName}`
+        )}&body=${encodeURIComponent(messageText)}`;
+        window.location.href = mailtoUrl;
+      }
+
       setSubmitted(true);
     } catch (error) {
       setBookingError(
-        error instanceof Error ? error.message : "Payment failed. Booking was not created.",
+        error instanceof Error ? error.message : "Reservation failed. Please try again.",
       );
     } finally {
-      setIsProcessingPayment(false);
+      setIsSubmittingBooking(false);
     }
   };
 
-  const steps = ["Stay Details", "Guest Details", "Advance Payment"];
+  const steps = ["Stay Details", "Guest Details", "Confirm Reservation"];
 
   if (submitted) {
     const confirmedBooking = bookings.find((b) => b.id === bookingId) || null;
+    const propInfo = PROPERTIES[form.property] || PROPERTIES["mysore"];
+    const roomInfo = ROOMS.find((r) => r.slug === form.roomType);
+    const roomName = roomInfo?.name || form.roomType;
+
+    const followUpMessage =
+      `Hello VANASURU Retreats,\n\n` +
+      `I have submitted reservation request (ID: ${bookingId || "confirmed"}):\n` +
+      `• Property: ${propInfo.name}\n` +
+      `• Room: ${roomName}\n` +
+      `• Dates: ${form.checkIn} to ${form.checkOut}\n` +
+      `• Guest: ${form.firstName} ${form.lastName} (${form.mobile})\n\n` +
+      `Please confirm my booking. Thank you!`;
+
+    const waFollowUpUrl = `https://wa.me/${BRAND.phoneWhatsapp}?text=${encodeURIComponent(followUpMessage)}`;
+    const emailFollowUpUrl = `mailto:vanasurumys@gmail.com?subject=${encodeURIComponent(
+      `Booking Follow-up - ${bookingId || "Reservation"} - ${form.firstName} ${form.lastName}`
+    )}&body=${encodeURIComponent(followUpMessage)}`;
+
     return (
       <SiteShell transparentHeader={false}>
         <div className="pt-32 pb-24 px-6">
           <div className="mx-auto max-w-2xl bg-card border border-[color:var(--gold)]/40 p-10 md:p-14 text-center space-y-6">
             <CheckCircle2 className="mx-auto text-emerald-700" size={60} />
             <h1 className="font-serif text-4xl text-[color:var(--forest)]">
-              Booking Confirmed!
+              Reservation Received!
             </h1>
             <p className="text-charcoal/70 leading-relaxed text-sm">
-              We received your {advanceDisplayStr} advance payment and reserved your room. Your
-              booking ID is <span className="font-mono font-bold text-[color:var(--forest)]">{bookingId || "confirmed"}</span>.
+              Your room reservation has been registered with our retreat desk. Your booking ID is{" "}
+              <span className="font-mono font-bold text-[color:var(--forest)]">{bookingId || "confirmed"}</span>.
+            </p>
+            <p className="text-xs text-charcoal/60 bg-[color:var(--sand)]/40 p-3 rounded">
+              <strong>Offline Payment Notice:</strong> No online payment was charged. You can settle your bill directly at the resort upon check-in via Cash, UPI, or Card.
             </p>
 
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs flex items-center justify-center gap-2">
               <Mail size={16} className="text-emerald-700 shrink-0" />
               <span>
-                Confirmation email &amp; official tax invoice sent to{" "}
+                Confirmation details &amp; tax invoice sent to{" "}
                 <strong className="text-emerald-800">{form.email || currentUser?.email}</strong>.
               </span>
             </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a
+                href={waFollowUpUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white px-6 py-3.5 text-[11px] font-bold tracking-[0.2em] uppercase transition-colors rounded-sm shadow-md"
+              >
+                <MessageCircle size={16} /> Chat on WhatsApp
+              </a>
+              <a
+                href={emailFollowUpUrl}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[color:var(--forest)] hover:bg-[color:var(--forest-deep)] text-white px-6 py-3.5 text-[11px] font-bold tracking-[0.2em] uppercase transition-colors rounded-sm shadow-md"
+              >
+                <Mail size={16} /> Email Retreat Desk
+              </a>
+            </div>
+
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 border-t border-border/40">
               <button
                 type="button"
                 onClick={() => setShowBillModal(true)}
@@ -444,7 +479,7 @@ function BookPage() {
               <span className="gold-divider ml-3" />
             </div>
             <h1 className="mt-5 font-serif text-4xl md:text-5xl text-[color:var(--forest)]">
-              Check dates, then secure with {advanceDisplayStr}.
+              Check dates, then reserve via WhatsApp or Email.
             </h1>
           </div>
 
@@ -905,23 +940,29 @@ function BookPage() {
                   </Field>
                   <Field label="Special Requests" className="md:col-span-2">
                     <textarea
-                      rows={5}
+                      rows={4}
                       value={form.requests}
                       onChange={(e) => set("requests", e.target.value)}
                       className={inp}
                       placeholder="Dietary restrictions, bedding configurations, or details about the celebration..."
                     />
                   </Field>
-                  <div className="md:col-span-2 rounded-sm border border-[color:var(--gold)]/25 bg-[color:var(--sand)]/20 p-5 text-sm text-charcoal/75">
-                    <div className="font-serif text-xl text-[color:var(--forest)]">
-                      Advance due now: {advanceDisplayStr}
+                  <div className="md:col-span-2 rounded-sm border border-emerald-600/30 bg-emerald-50/50 p-6 text-sm text-charcoal/80 space-y-4">
+                    <div className="flex items-center gap-2 text-emerald-900 font-serif text-xl font-bold">
+                      <CheckCircle2 size={22} className="text-emerald-700" />
+                      Direct Reservation (No Online Payment Required)
                     </div>
-                    <p className="mt-2 text-xs leading-relaxed">
-                      The backend will re-check room availability, create a Razorpay order, verify
-                      the payment signature, and only then confirm the booking.
+                    <p className="text-xs leading-relaxed text-charcoal/75">
+                      No online payment or credit card is required to reserve. Your booking request will be registered directly with the retreat front desk, and you can settle your bill upon arrival via Cash, UPI, or Card.
                     </p>
+                    <div className="bg-white/90 p-4 rounded border border-emerald-200/80 text-xs grid grid-cols-1 sm:grid-cols-2 gap-3 text-charcoal/80">
+                      <div><strong className="text-emerald-950">Property:</strong> {PROPERTIES[form.property]?.name || form.property}</div>
+                      <div><strong className="text-emerald-950">Room Type:</strong> {ROOMS.find(r => r.slug === form.roomType)?.name || form.roomType}</div>
+                      <div><strong className="text-emerald-950">Dates:</strong> {form.checkIn} → {form.checkOut}</div>
+                      <div><strong className="text-emerald-950">Guests:</strong> {form.adults} Adult(s){form.children ? `, ${form.children} Child(ren)` : ""}</div>
+                    </div>
                   </div>
-                  <label className="md:col-span-2 flex items-start gap-3 text-sm text-charcoal/80">
+                  <label className="md:col-span-2 flex items-start gap-3 text-sm text-charcoal/80 cursor-pointer">
                     <input
                       required
                       type="checkbox"
@@ -930,28 +971,39 @@ function BookPage() {
                       className="mt-1 accent-[color:var(--gold)] cursor-pointer"
                     />
                     <span className="text-xs">
-                      I agree to the booking terms and understand the {advanceDisplayStr} advance is
-                      required to confirm this reservation.
+                      I agree to the booking terms and confirm this reservation request for VANASURU Retreats.
                     </span>
                   </label>
                 </div>
-                <div className="mt-10 flex justify-between gap-4">
+                <div className="mt-10 flex flex-col sm:flex-row justify-between items-center gap-4">
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    disabled={isProcessingPayment}
-                    className="inline-flex items-center gap-2 px-6 py-3 text-[11px] tracking-[0.28em] uppercase font-semibold border border-border text-[color:var(--forest)] hover:border-[color:var(--gold)] cursor-pointer disabled:opacity-50"
+                    disabled={isSubmittingBooking}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 text-[11px] tracking-[0.28em] uppercase font-semibold border border-border text-[color:var(--forest)] hover:border-[color:var(--gold)] cursor-pointer disabled:opacity-50"
                   >
                     <ChevronLeft size={16} /> Back
                   </button>
-                  <button
-                    type="submit"
-                    disabled={isProcessingPayment}
-                    className="inline-flex items-center gap-2 px-8 py-3.5 text-[11px] tracking-[0.28em] uppercase font-semibold bg-[color:var(--forest)] text-ivory hover:bg-[color:var(--gold)] hover:text-[color:var(--forest-deep)] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isProcessingPayment ? "Processing..." : `Pay ${advanceDisplayStr}`}{" "}
-                    <ChevronRight size={16} />
-                  </button>
+                  <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleCompleteBooking("whatsapp")}
+                      disabled={isSubmittingBooking || !form.terms}
+                      className="inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[11px] tracking-[0.24em] uppercase font-bold bg-[#25D366] hover:bg-[#20ba59] text-white shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      <MessageCircle size={16} />
+                      {isSubmittingBooking ? "Reserving..." : "Confirm via WhatsApp"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCompleteBooking("email")}
+                      disabled={isSubmittingBooking || !form.terms}
+                      className="inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[11px] tracking-[0.24em] uppercase font-bold bg-[color:var(--forest)] hover:bg-[color:var(--gold)] text-ivory hover:text-[color:var(--forest-deep)] shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      <Mail size={16} />
+                      {isSubmittingBooking ? "Reserving..." : "Confirm via Email"}
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -960,85 +1012,6 @@ function BookPage() {
       </div>
     </SiteShell>
   );
-}
-
-function loadRazorpayCheckout() {
-  if (window.Razorpay) return Promise.resolve();
-
-  return new Promise<void>((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener(
-        "error",
-        () => reject(new Error("Unable to load Razorpay Checkout.")),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Unable to load Razorpay Checkout."));
-    document.body.appendChild(script);
-  });
-}
-
-function openRazorpayCheckout({
-  keyId,
-  orderId,
-  amount,
-  currency,
-  booking,
-  guestName,
-}: {
-  keyId: string;
-  orderId: string;
-  amount: number;
-  currency: string;
-  booking: CreateBookingInput;
-  guestName: string;
-}) {
-  return new Promise<RazorpayPaymentResponse>((resolve, reject) => {
-    if (!window.Razorpay) {
-      reject(new Error("Razorpay Checkout is unavailable."));
-      return;
-    }
-
-    const checkout = new window.Razorpay({
-      key: keyId,
-      amount,
-      currency,
-      name: "VANASURU",
-      description: "Booking advance payment",
-      order_id: orderId,
-      prefill: {
-        name: guestName,
-        email: booking.guestDetails.email,
-        contact: booking.guestDetails.mobile,
-      },
-      notes: {
-        property:
-          (PROPERTIES as Record<string, { name: string }>)[booking.property]?.name ??
-          booking.property,
-        roomType: booking.roomTypeSlug,
-        checkIn: booking.checkIn,
-        checkOut: booking.checkOut,
-      },
-      theme: { color: "#1f3d2b" },
-      handler: resolve,
-      modal: {
-        ondismiss: () => reject(new Error("Payment was cancelled before completion.")),
-      },
-    });
-
-    checkout.open();
-  });
 }
 
 const inp =

@@ -112,32 +112,17 @@ export function RoomCard({
             ))}
           </div>
         )}
-        <div
-          className={`mt-6 flex items-center ${hidePrice ? "justify-end" : "justify-between"} border-t border-border/60 pt-4 gap-2`}
-        >
-          {!hidePrice && (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[10px] tracking-wider uppercase text-charcoal/60 font-bold">Room Tariff:</span>
-                <span className="font-serif text-lg font-bold text-[color:var(--forest)]">
-                  {room.pricePerNight
-                    ? `₹${room.pricePerNight.toLocaleString("en-IN")}`
-                    : room.price || "₹3,500"}
-                </span>
-                <span className="text-[11px] font-sans text-charcoal/60 font-normal">/ night</span>
-              </div>
-              <div className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
-                <Tag size={12} className="text-[color:var(--gold)]" />
-                <span>Reserve with <strong className="text-[color:var(--forest-deep)]">₹{(room.advanceAmount ?? 1).toLocaleString("en-IN")} advance</strong></span>
-              </div>
-            </div>
-          )}
+        <div className="mt-6 flex flex-wrap items-center justify-between border-t border-border/60 pt-4 gap-3">
+          <div className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+            <Tag size={12} className="text-[color:var(--gold)]" />
+            <span>Reserve via <strong className="text-[color:var(--forest-deep)]">WhatsApp or Email</strong></span>
+          </div>
           <Link
             to={targetLink}
             search={searchObj}
             className="text-[10px] tracking-[0.24em] uppercase font-semibold text-[color:var(--gold)] border-b border-[color:var(--gold)] pb-0.5 hover:text-[color:var(--forest)] hover:border-[color:var(--forest)] transition-colors shrink-0"
           >
-            Book Room
+            Reserve Room
           </Link>
         </div>
       </div>

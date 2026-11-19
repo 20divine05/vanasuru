@@ -90,7 +90,7 @@ function getSmtpTransporter() {
   const smtpFrom =
     (process.env.SMTP_FROM || (import.meta as any).env?.SMTP_FROM || '"VANASURU Retreats" <vanasuru05@gmail.com>').trim();
   const adminEmail =
-    (process.env.ADMIN_EMAIL || (import.meta as any).env?.ADMIN_EMAIL || "vanasuru05@gmail.com").trim();
+    (process.env.ADMIN_EMAIL || (import.meta as any).env?.ADMIN_EMAIL || "vanasurumys@gmail.com").trim() || "vanasurumys@gmail.com";
 
   return {
     host: smtpHost,
@@ -123,7 +123,7 @@ export const sendBookingConfirmationEmail = createServerFn({ method: "POST" })
     } else if (rawAmount > 5000 && !isEvent) {
       rawAmount = Math.round(rawAmount / 100);
     }
-    const advancePaidStr = rawAmount > 0 ? `₹${rawAmount.toLocaleString("en-IN")}` : "Paid / Confirmed";
+    const advancePaidStr = rawAmount > 0 ? `₹${rawAmount.toLocaleString("en-IN")}` : "Pay at Check-In (Cash / UPI / Card)";
 
     if (!config) {
       console.log(`\n======================================================`);
@@ -210,40 +210,108 @@ export const sendBookingConfirmationEmail = createServerFn({ method: "POST" })
         </div>
       `;
 
-      // Admin Alert HTML
-      const adminHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; background-color: #ffffff; border: 1px solid #dddddd; color: #333333;">
-          <h2 style="color: #1b4d3e; margin-top: 0;">🔔 New Booking Notification</h2>
-          <p style="font-size: 14px;">A new reservation has been placed on VANASURU:</p>
+      // Admin Alert HTML for vanasurumys@gmail.com
+      const fullAddress = [
+        booking.guestDetails?.address,
+        booking.guestDetails?.city,
+        booking.guestDetails?.state,
+        booking.guestDetails?.pincode,
+        booking.guestDetails?.country,
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-            <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Booking ID</td><td style="padding: 8px; border: 1px solid #ddd;">${booking.id}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Guest Name</td><td style="padding: 8px; border: 1px solid #ddd;">${guestName}</td></tr>
-            <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td><td style="padding: 8px; border: 1px solid #ddd;">${customerEmail}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Mobile</td><td style="padding: 8px; border: 1px solid #ddd;">${booking.guestDetails.mobile || "N/A"}</td></tr>
-            <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Property</td><td style="padding: 8px; border: 1px solid #ddd;">${propertyName}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Room Allocated</td><td style="padding: 8px; border: 1px solid #ddd;">${roomName}</td></tr>
-            <tr style="background-color: #f9f9f9;"><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Dates</td><td style="padding: 8px; border: 1px solid #ddd;">${booking.checkIn} to ${booking.checkOut}</td></tr>
-            <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Advance Payment</td><td style="padding: 8px; border: 1px solid #ddd; color: #1b4d3e; font-weight: bold;">${advancePaidStr}</td></tr>
+      const idProofInfo = booking.guestDetails?.idProofType
+        ? `${booking.guestDetails.idProofType} (${booking.guestDetails.idProofNumber || "No number provided"})`
+        : "Not provided";
+
+      const adminHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 25px; background-color: #ffffff; border: 1px solid #dddddd; color: #333333;">
+          <div style="border-bottom: 2px solid #1b4d3e; padding-bottom: 12px; margin-bottom: 20px;">
+            <h2 style="color: #1b4d3e; margin: 0 0 6px 0; font-size: 22px;">🔔 New Booking Reservation Reference</h2>
+            <p style="margin: 0; font-size: 13px; color: #666666;">VANASURU Nature Retreats — Automated Reservation Desk</p>
+          </div>
+
+          <p style="font-size: 14px; line-height: 1.5;">A new reservation has been placed and assigned. Here are the complete guest and stay details for your reference:</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+            <tr style="background-color: #f4f6f5;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;">Booking ID</td>
+              <td style="padding: 10px; border: 1px solid #ddd; font-family: monospace; font-size: 14px; font-weight: bold; color: #1b4d3e;">${booking.id}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Guest Name</td>
+              <td style="padding: 10px; border: 1px solid #ddd;"><strong>${guestName}</strong></td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Email Address</td>
+              <td style="padding: 10px; border: 1px solid #ddd;"><a href="mailto:${customerEmail}" style="color: #1b4d3e;">${customerEmail}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Mobile Phone</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                <a href="tel:${booking.guestDetails?.mobile}" style="color: #1b4d3e; font-weight: bold;">${booking.guestDetails?.mobile || "N/A"}</a>
+                ${booking.guestDetails?.mobile ? ` &nbsp;|&nbsp; <a href="https://wa.me/${booking.guestDetails.mobile.replace(/\D/g, '')}" style="color: #25D366; text-decoration: none; font-weight: bold;">💬 WhatsApp Guest</a>` : ""}
+              </td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Residential Address</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${fullAddress || "N/A"}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">ID Proof Details</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${idProofInfo}</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Property Location</td>
+              <td style="padding: 10px; border: 1px solid #ddd;"><strong>${propertyName}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Room / Venue Assigned</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${roomName}</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Stay Dates</td>
+              <td style="padding: 10px; border: 1px solid #ddd;"><strong>${checkInStr}</strong> to <strong>${checkOutStr}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Guest Count</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${booking.adults || 1} Adult(s), ${booking.children || 0} Child(ren)</td>
+            </tr>
+            ${
+              booking.guestDetails?.specialNotes
+                ? `<tr style="background-color: #f9f9f9;">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Special Requests / Notes</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">${booking.guestDetails.specialNotes}</td>
+                   </tr>`
+                : ""
+            }
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
+              <td style="padding: 10px; border: 1px solid #ddd; color: #1b4d3e; font-weight: bold;">Pay at Check-In / Offline (Cash / UPI / Card)</td>
+            </tr>
           </table>
-          <p style="font-size: 12px; color: #666;">View this booking in your VANASURU Admin Dashboard for room assignment and guest operations.</p>
+
+          <div style="background-color: #f3f0e6; padding: 12px 16px; border-left: 4px solid #b8860b; margin-top: 20px; font-size: 12px; color: #555555;">
+            This reservation is automatically logged into the VANASURU database and timeline grid. Settle guest accounts and extra charges at front desk during checkout.
+          </div>
         </div>
       `;
 
-      // 1. Send to Customer (and CC Admin)
+      // 1. Send to Customer (and CC vanasurumys@gmail.com for reference)
       await transporter.sendMail({
         from: `VANASURU Retreats <${config.from}>`,
         to: customerEmail,
-        cc: config.adminEmail || "vanasurumys@gmail.com",
+        cc: "vanasurumys@gmail.com",
         subject: `Booking Confirmed! Welcome to ${propertyName} (${booking.id})`,
         html: customerHtml,
       });
 
-      // 2. Send to Admin Alert
+      // 2. Send dedicated Admin Alert directly to vanasurumys@gmail.com
       await transporter.sendMail({
         from: `VANASURU System <${config.from}>`,
-        to: config.adminEmail || "vanasurumys@gmail.com",
-        subject: `🔔 New Reservation Alert: ${booking.id} - ${guestName} (${propertyName})`,
+        to: "vanasurumys@gmail.com",
+        subject: `🔔 New Reservation: ${booking.id} - ${guestName} (${propertyName})`,
         html: adminHtml,
       });
 
